@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { isUsingSupabaseAuth } from "@/lib/auth";
 import { useWorkspace } from "@/store/WorkspaceContext";
 
 const features = [
@@ -37,7 +36,7 @@ const features = [
 export function LoginPage() {
   const { login, startDemoSession, authenticated, authLoading } = useWorkspace();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("ramiyaa@company.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -142,9 +141,7 @@ export function LoginPage() {
 
         <div className="relative z-10 border-t border-white/10 px-10 py-6 xl:px-14">
           <p className="text-xs text-slate-500">
-            {isUsingSupabaseAuth()
-              ? "Sign in with your Supabase recruiter account."
-              : "Local fallback: ramiyaa@company.com / Recruit@2024"}
+            Authorized recruiter access only. Contact HR Operations for account provisioning.
           </p>
         </div>
       </div>
@@ -194,7 +191,7 @@ export function LoginPage() {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ramiyaa@company.com"
+                    placeholder="you@company.com"
                     className="h-11 pl-10"
                     required
                   />
