@@ -16,7 +16,7 @@ import { UploadZone } from "@/components/jobs/UploadZone";
 import { MatchScore } from "@/components/candidates/MatchScore";
 import { SkillBadge, StatusBadge } from "@/components/candidates/StatusBadge";
 import { useWorkspace } from "@/store/WorkspaceContext";
-import { downloadResultsCsv, runDemoScreening, screenResumes } from "@/lib/api";
+import { downloadResultsCsv, screenResumes } from "@/lib/api";
 import { uid } from "@/lib/utils";
 import type { Candidate } from "@/types";
 
@@ -88,10 +88,11 @@ export function JobDetailPage() {
         jobDescription: job!.description,
         requiredSkills: job!.requiredSkills.join(", "),
         files,
+        jobId: jobId!,
       });
     },
-    onSuccess: (data, files) => {
-      ingestScreeningResults(
+    onSuccess: async (data, files) => {
+      await ingestScreeningResults(
         jobId!,
         data.results,
         files.map((f) => f.name)
@@ -108,20 +109,6 @@ export function JobDetailPage() {
         type: "error",
       });
     },
-  });
-
-  const demoMutation = useMutation({
-    mutationFn: runDemoScreening,
-    onSuccess: (data) => {
-      ingestScreeningResults(jobId!, data.results);
-      setTab("Candidates");
-    },
-    onError: () =>
-      addToast({
-        title: "Demo failed",
-        description: "Start backend with start_backend.ps1",
-        type: "error",
-      }),
   });
 
   if (!job) {
@@ -207,21 +194,11 @@ export function JobDetailPage() {
         {showUpload && (
           <Card className="mb-4">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold">Upload Candidates</h3>
-                  <p className="text-xs text-slate-500">
-                    Upload multiple resumes for AI screening against this job.
-                  </p>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={demoMutation.isPending}
-                  onClick={() => demoMutation.mutate()}
-                >
-                  Try Demo Data
-                </Button>
+              <div>
+                <h3 className="text-sm font-semibold">Upload Candidates</h3>
+                <p className="text-xs text-slate-500">
+                  Upload multiple resumes (PDF/DOCX) for AI screening against this job.
+                </p>
               </div>
             </CardHeader>
             <CardBody>

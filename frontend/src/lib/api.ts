@@ -13,15 +13,6 @@ export async function healthCheck() {
   return data as { status: string };
 }
 
-export async function getDemoConfig() {
-  const { data } = await api.get("/demo-config");
-  return data as {
-    job_description: string;
-    required_skills: string;
-    sample_resume_count: number;
-  };
-}
-
 export async function extractSkillsFromJd(job_description: string) {
   const { data } = await api.post("/extract-skills-from-jd", { job_description });
   return data as {
@@ -31,22 +22,21 @@ export async function extractSkillsFromJd(job_description: string) {
   };
 }
 
-export async function runDemoScreening() {
-  const { data } = await api.post("/run-demo");
-  return data as ScreeningResponse;
-}
-
 export async function screenResumes(params: {
   jobDescription: string;
   requiredSkills: string;
   files: File[];
   jobDescriptionFile?: File | null;
+  jobId?: string;
 }) {
   const formData = new FormData();
   formData.append("job_description", params.jobDescription);
   formData.append("required_skills", params.requiredSkills);
   if (params.jobDescriptionFile) {
     formData.append("job_description_file", params.jobDescriptionFile);
+  }
+  if (params.jobId) {
+    formData.append("job_id", params.jobId);
   }
   params.files.forEach((file) => formData.append("files", file));
 

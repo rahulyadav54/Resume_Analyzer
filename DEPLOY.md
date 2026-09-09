@@ -57,14 +57,27 @@
 ## 4. Verify production
 
 1. Open your Vercel URL → log in → **Overview**.
-2. Click **Try Demo Data** (calls `POST /run-demo` on Render).
-3. Open a job → **Upload Resumes** → upload PDF/DOCX files.
+2. Create a job with title, description, and required skills.
+3. Open the job → **Upload Resumes** → upload PDF/DOCX files → review ranked candidates.
+
+---
+
+## 5. Optional — Supabase database
+
+See [`supabase/SETUP.md`](supabase/SETUP.md) for full steps.
+
+1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql).
+2. Add to **Render** environment:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_KEY` (service role — backend only)
+3. Redeploy Render.
+4. Check `https://YOUR-API.onrender.com/health` → `database.enabled: true`.
 
 ---
 
 ## Notes
 
 - **Free Render** services sleep after ~15 min idle; first request may take 30–60s.
-- Uploaded files on Render use ephemeral disk (fine for demos; not for long-term storage).
-- Demo resumes live in `/resumes` at repo root and work when the full repo is deployed.
+- Uploaded files on Render use ephemeral disk; use Supabase for persistent workspace data.
 - Never commit `.env` files with secrets.
+- Supabase stores jobs, candidates, interviews, and resume metadata persistently.

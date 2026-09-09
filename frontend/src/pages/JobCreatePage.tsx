@@ -36,9 +36,9 @@ export function JobCreatePage() {
 
   const total = weightsTotal(weights);
 
-  const submit = () => {
+  const submit = async () => {
     if (!title.trim() || !description.trim()) return;
-    const job = addJob({
+    const job = await addJob({
       title: title.trim(),
       department,
       location: location || "Remote",

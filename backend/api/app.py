@@ -8,13 +8,9 @@ from pydantic import BaseModel
 
 from src.text_extractor import extract_resume_text
 from src.skill_matcher import extract_skills_from_jd
-from src.screening_service import (
-    screen_resume_files,
-    run_demo_screening,
-    UPLOAD_FOLDER,
-    DEFAULT_JOB_DESCRIPTION,
-    DEFAULT_REQUIRED_SKILLS,
-)
+from src.screening_service import screen_resume_files, UPLOAD_FOLDER
+from src.db.repository import is_db_enabled, save_screening_results, db_health
+from api.workspace import router as workspace_router
 
 app = FastAPI(
     title="Automated Resume Screening API",
@@ -38,6 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(workspace_router)
+
 
 class JobDescriptionRequest(BaseModel):
     job_description: str
@@ -49,24 +47,15 @@ def home():
         "message": "Automated Resume Screening API is running",
         "endpoints": {
             "screen_resumes": "POST /screen-resumes",
-            "run_demo": "POST /run-demo",
             "extract_skills": "POST /extract-skills-from-jd",
+            "workspace": "GET /workspace",
         },
     }
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
-
-
-@app.get("/demo-config")
-def demo_config():
-    return {
-        "job_description": DEFAULT_JOB_DESCRIPTION,
-        "required_skills": ", ".join(DEFAULT_REQUIRED_SKILLS),
-        "sample_resume_count": len(list(UPLOAD_FOLDER.parent.parent.glob("resumes/*"))),
-    }
+    return {"status": "ok", "database": db_health()}
 
 
 @app.post("/extract-skills-from-jd")
@@ -82,20 +71,13 @@ def extract_skills_endpoint(payload: JobDescriptionRequest):
     }
 
 
-@app.post("/run-demo")
-def run_demo():
-    try:
-        return run_demo_screening()
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Demo screening failed: {exc}")
-
-
 @app.post("/screen-resumes")
 async def screen_resumes(
     job_description: str = Form(""),
     required_skills: str = Form(""),
     files: list[UploadFile] = File(...),
     job_description_file: Optional[UploadFile] = File(None),
+    job_id: Optional[str] = Form(None),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="Please upload at least one resume.")
@@ -139,10 +121,17 @@ async def screen_resumes(
         raise HTTPException(status_code=400, detail="No valid resume files were uploaded.")
 
     try:
-        return screen_resume_files(
+        response = screen_resume_files(
             file_paths=saved_paths,
             job_description=jd_text,
             required_skills=skills_list or None,
         )
+
+        if job_id and is_db_enabled():
+            file_names = [os.path.basename(path) for path in saved_paths]
+            save_screening_results(job_id, response["results"], file_names)
+            response["saved_to_database"] = True
+
+        return response
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Screening failed: {exc}")

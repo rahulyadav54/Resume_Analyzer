@@ -93,17 +93,3 @@ def screen_resume_files(
         "job_description_used": jd_text,
         "results": ranked,
     }
-
-
-def run_demo_screening() -> dict:
-    resume_files = sorted(
-        str(path)
-        for path in RESUME_FOLDER.glob("*")
-        if path.suffix.lower() in {".pdf", ".docx", ".txt"}
-    )
-
-    return screen_resume_files(
-        file_paths=resume_files,
-        job_description=DEFAULT_JOB_DESCRIPTION,
-        required_skills=DEFAULT_REQUIRED_SKILLS,
-    )

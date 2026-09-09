@@ -28,8 +28,8 @@ export function TemplatesPage() {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => {
-                      const job = addJob({
+                    onClick={async () => {
+                      const job = await addJob({
                         title: t.name,
                         department: t.department,
                         location: "Remote · India",
