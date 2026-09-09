@@ -34,7 +34,11 @@ app = FastAPI(
 
 
 def _cors_origins() -> list[str]:
-    default = "https://resume-analyzer-lyart-kappa.vercel.app,http://localhost:5173"
+    default = (
+        "https://resumeanalyzer.zayacodehub.in,"
+        "https://resume-analyzer-lyart-kappa.vercel.app,"
+        "http://localhost:5173"
+    )
     raw = os.getenv("CORS_ORIGINS", default).strip()
     if raw == "*":
         return ["*"]

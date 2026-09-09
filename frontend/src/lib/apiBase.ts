@@ -8,7 +8,8 @@ function isVercelProduction(): boolean {
     import.meta.env.PROD &&
     typeof window !== "undefined" &&
     (window.location.hostname.includes("vercel.app") ||
-      window.location.hostname.includes("resume-analyzer"))
+      window.location.hostname.includes("resume-analyzer") ||
+      window.location.hostname.includes("zayacodehub.in"))
   );
 }
 

@@ -50,11 +50,19 @@
 
 1. In **Render** → your web service → **Environment** → set:
    ```
-   CORS_ORIGINS=https://resume-analyzer-lyart-kappa.vercel.app
+   CORS_ORIGINS=https://resumeanalyzer.zayacodehub.in,https://resume-analyzer-lyart-kappa.vercel.app,http://localhost:5173
    ```
    Add preview URLs if needed (comma-separated, no trailing slash).
 2. Redeploy Render after changing CORS.
 3. In **Vercel**, redeploy if you change `VITE_API_BASE`.
+
+---
+
+## 3b. Custom domain — resumeanalyzer.zayacodehub.in
+
+See **[CUSTOM_DOMAIN.md](CUSTOM_DOMAIN.md)** for the full checklist (Vercel domains, DNS CNAME, Supabase redirect URLs).
+
+**Production URL:** `https://resumeanalyzer.zayacodehub.in`
 
 ---
 

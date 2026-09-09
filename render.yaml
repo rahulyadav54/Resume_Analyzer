@@ -11,7 +11,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.12.0"
       - key: CORS_ORIGINS
-        value: https://resume-analyzer-lyart-kappa.vercel.app
+        value: https://resumeanalyzer.zayacodehub.in,https://resume-analyzer-lyart-kappa.vercel.app,http://localhost:5173
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY

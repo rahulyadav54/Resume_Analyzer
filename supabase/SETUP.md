@@ -67,11 +67,22 @@ Redeploy the backend after saving.
 
 | Variable | Value |
 |----------|--------|
-| `VITE_API_BASE` | your Render API URL or `/api` |
+| `VITE_API_BASE` | `/api` (recommended — uses Vercel proxy to Render) |
 | `VITE_SUPABASE_URL` | `https://xxxxx.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | anon public key |
 
 Redeploy the frontend after saving.
+
+### Custom domain (resumeanalyzer.zayacodehub.in)
+
+In **Supabase** → **Authentication** → **URL Configuration**:
+
+| Setting | Value |
+|---------|--------|
+| Site URL | `https://resumeanalyzer.zayacodehub.in` |
+| Redirect URLs | `https://resumeanalyzer.zayacodehub.in/**` |
+
+Full DNS and Vercel steps: see [`CUSTOM_DOMAIN.md`](../CUSTOM_DOMAIN.md).
 
 ## 7. Verify
 
