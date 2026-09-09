@@ -51,7 +51,7 @@ export function TopBar({
           <Settings size={16} />
         </Link>
         <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-          RM
+          R
         </div>
       </div>
     </header>

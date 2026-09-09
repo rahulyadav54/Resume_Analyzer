@@ -337,7 +337,7 @@ def create_interview(
     candidate_id: str,
     job_id: str,
     interview_type: str = "Technical",
-    interviewer: str = "Rahul Mehta",
+    interviewer: str = "Ramiyaa",
 ) -> dict[str, Any] | None:
     client = get_supabase()
     if not client:

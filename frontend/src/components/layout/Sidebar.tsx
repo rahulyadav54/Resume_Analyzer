@@ -118,10 +118,10 @@ export function Sidebar({
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-2.5 rounded-lg bg-slate-50 px-2.5 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-            RM
+            R
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-900">Rahul Mehta</p>
+            <p className="truncate text-sm font-medium text-slate-900">Ramiyaa</p>
             <p className="truncate text-xs text-slate-500">Senior Recruiter</p>
           </div>
         </div>

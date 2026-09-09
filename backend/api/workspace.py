@@ -40,7 +40,7 @@ class InterviewCreatePayload(BaseModel):
     candidateId: str
     jobId: str
     type: str = "Technical"
-    interviewer: str = "Rahul Mehta"
+    interviewer: str = "Ramiyaa"
 
 
 class ScreeningSavePayload(BaseModel):

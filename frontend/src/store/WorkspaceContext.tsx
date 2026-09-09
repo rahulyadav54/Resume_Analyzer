@@ -413,7 +413,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           jobId,
           date: new Date(Date.now() + 3 * 86400000).toISOString(),
           type: "Technical",
-          interviewer: "Rahul Mehta",
+          interviewer: "Ramiyaa",
           status: "scheduled",
         },
         ...prev,

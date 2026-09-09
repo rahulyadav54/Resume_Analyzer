@@ -81,7 +81,7 @@ ${
 }
 
 Best regards,
-Rahul Mehta
+Ramiyaa
 Talent Acquisition`;
     setEmailDraft(body);
     setEmailOpen(true);

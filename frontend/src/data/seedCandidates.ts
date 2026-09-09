@@ -235,7 +235,7 @@ export const SEED_INTERVIEWS: Interview[] = [
     jobId: "job_aiml",
     date: new Date(Date.now() + 4 * 86400000).toISOString(),
     type: "Hiring Manager",
-    interviewer: "Rahul Mehta",
+    interviewer: "Ramiyaa",
     status: "scheduled",
   },
 ];

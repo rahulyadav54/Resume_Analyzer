@@ -44,7 +44,7 @@ export function DashboardPage() {
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-[28px] font-semibold tracking-tight text-slate-900">
-              {greeting}, Rahul
+              {greeting}, Ramiyaa
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               Here&apos;s what&apos;s happening across your recruitment pipeline.
