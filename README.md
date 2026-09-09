@@ -1,631 +1,321 @@
-# Automated Resume Screening Tool
+# AI Recruit — Automated Resume Screening & ATS Platform
 
-## 🚀 Project Overview
+> An AI-driven Applicant Tracking System that automates resume screening, ranks candidates with explainable NLP scoring, and manages the full recruitment pipeline — from job creation to interview scheduling.
 
-The **Automated Resume Screening Tool** is an AI-driven HR Tech application that helps recruiters automatically screen resumes based on a given job description and required skills.
-
-The system extracts text from resumes, identifies candidate skills, compares resumes with job requirements using NLP techniques, calculates matching scores, ranks candidates, and generates shortlist decisions.
-
-This project simulates a real Applicant Tracking System (ATS) workflow using Python, Machine Learning, NLP, FastAPI, and a premium Next.js recruiter dashboard.
+**For jury presentations and viva questions, see [JURY_PRESENTATION_GUIDE.md](JURY_PRESENTATION_GUIDE.md).**
 
 ---
 
-# 🎯 Problem Statement
+## Project Overview
 
-Recruiters often receive hundreds of resumes for a single role. Manually reviewing each resume is:
+**AI Recruit** helps recruiters screen hundreds of resumes in minutes instead of days. The system:
 
-* time-consuming
-* inconsistent
-* repetitive
-* inefficient
+1. Extracts text from PDF, DOCX, and TXT resumes
+2. Parses structured profile data (education, projects, internships, certifications)
+3. Matches candidate skills against job requirements
+4. Computes resume–job-description similarity using TF-IDF + cosine similarity
+5. Calculates a weighted final score with transparent breakdown
+6. Ranks candidates and generates explainable AI recommendations
+7. Manages the full hiring workflow in a recruiter dashboard
 
-This project automates the initial screening process by:
-
-* extracting resume text
-* matching skills with job requirements
-* calculating resume-job similarity
-* ranking candidates automatically
-* identifying missing skills
-* generating shortlist decisions
+This is a **full-stack ATS simulation** built with Python/FastAPI, React/Vite, and Supabase — deployable on Vercel + Render.
 
 ---
 
-# 🏢 Industry Relevance
+## Key Innovations
 
-Modern HR Tech companies and Applicant Tracking Systems use AI/NLP-based resume screening systems to:
-
-* reduce manual recruitment effort
-* improve hiring speed
-* shortlist better candidates
-* standardize resume evaluation
-* improve recruitment efficiency
-
-This project demonstrates concepts used in:
-
-* ATS platforms
-* HR automation systems
-* AI recruitment tools
-* resume ranking systems
-* talent analytics platforms
+| # | Innovation | Description |
+|---|-----------|-------------|
+| 1 | **Multi-factor explainable scoring** | 60% skill match + 25% TF-IDF similarity + 15% profile strength — every score is broken down and auditable |
+| 2 | **Structured resume intelligence** | Regex + section-aware parsing extracts education, projects, internships, certifications, and keywords from unstructured text |
+| 3 | **Auto skill extraction from JD** | Paste a job description; the system auto-detects required skills from a 50+ skill dictionary |
+| 4 | **AI recommendation engine** | Generates strengths, concerns, priority, and next-action recommendations for every candidate |
+| 5 | **End-to-end ATS workflow** | Jobs → Upload → Screen → Rank → Shortlist → Compare → Interview → Analytics in one platform |
+| 6 | **Demo + production dual mode** | Instant demo session for presentations; Supabase-backed persistence for real data |
+| 7 | **Batch screening at scale** | Bulk upload with per-job limits, batch progress tracking, and automatic re-ranking |
+| 8 | **Side-by-side candidate comparison** | Compare 2+ candidates across 8 metrics with best-value highlighting |
+| 9 | **Cloud-ready deployment** | Vercel (frontend) + Render (backend) + Supabase (PostgreSQL) |
 
 ---
 
-# ✨ Features
+## Features
 
-✅ Upload multiple resumes
-✅ Supports TXT, PDF, and DOCX resumes
-✅ Dynamic job description input
-✅ Dynamic required skills input
-✅ Resume text extraction
-✅ Text cleaning and preprocessing
-✅ Skill extraction
-✅ TF-IDF vectorization
-✅ Cosine similarity scoring
-✅ Resume ranking
-✅ Shortlist / Review / Reject decision
-✅ Matched and missing skills analysis
-✅ CSV report generation
-✅ FastAPI backend
-✅ Premium Next.js recruiter dashboard
-✅ Interactive analytics visualization
-✅ CSV download button
+### AI Screening Engine
+- Upload multiple resumes (PDF, DOCX, TXT)
+- Job description input via text or file upload
+- Auto-extract required skills from job description
+- Manual skill override
+- TF-IDF vectorization + cosine similarity scoring
+- Weighted multi-factor final score
+- Automatic candidate ranking
+- Shortlist / Review / Not Suitable decisions
+- Matched and missing skills analysis
+- AI-generated recommendations with strengths and concerns
+- CSV report generation
+- Batch upload with progress tracking
+
+### Recruiter Dashboard
+- Pipeline overview (active jobs, candidates, screened, shortlisted, interviews)
+- Job creation with templates
+- Drag-and-drop resume upload zone
+- Per-job candidate management with search, filter, and sort
+- Candidate detail with full score breakdown and evidence
+- Side-by-side candidate comparison
+- Shortlisted candidates view
+- Interview scheduling and tracking
+- Resume library per job
+- Recruitment analytics (funnel, score distribution, top skills)
+- Configurable AI settings (thresholds, scoring weights, explanation style)
+- Email draft generator (shortlist / interview / reject)
+- Individual candidate report export
+- Demo session with pre-loaded sample data
+
+### Backend API
+- `POST /screen-resumes` — upload and screen resumes
+- `POST /run-demo` — run screening on bundled sample resumes
+- `POST /extract-skills-from-jd` — auto-extract skills from job description
+- `GET /workspace` — fetch all jobs, candidates, interviews, resumes
+- `POST /workspace/jobs` — create a job
+- `PATCH /workspace/candidates/{id}/status` — update candidate status
+- `POST /workspace/interviews` — schedule interview
+- `POST /workspace/jobs/{id}/rerank` — re-rank candidates
+- `GET /health` — API and database health check
+
+### Database (Supabase)
+- Jobs with scoring weights and skill requirements
+- Candidates with full screening results and AI recommendations
+- Interviews linked to candidates and jobs
+- Resume file records with analysis status
 
 ---
 
-# 🧠 System Workflow
+## System Workflow
 
-```text
-Resume Upload
-      ↓
-Text Extraction
-      ↓
-Text Cleaning
-      ↓
-Skill Extraction
-      ↓
-Job Description Matching
-      ↓
-TF-IDF Vectorization
-      ↓
-Cosine Similarity Scoring
-      ↓
-Final Score Calculation
-      ↓
-Candidate Ranking
-      ↓
-Shortlist / Review / Reject Decision
-      ↓
-CSV Report Generation
+```
+Login / Demo Session
+       ↓
+Create Job (title, description, required skills)
+       ↓
+Upload Resumes (PDF / DOCX / TXT) or Run Demo Screening
+       ↓
+┌──────────────────────────────────────────┐
+│         AI SCREENING PIPELINE            │
+│                                          │
+│  Text Extraction                         │
+│       ↓                                  │
+│  Text Cleaning & Preprocessing           │
+│       ↓                                  │
+│  Structured Profile Parsing              │
+│    (education, projects, internships,    │
+│     certifications, keywords)            │
+│       ↓                                  │
+│  Skill Extraction & Matching             │
+│       ↓                                  │
+│  TF-IDF Cosine Similarity (Resume ↔ JD) │
+│       ↓                                  │
+│  Profile Score Calculation               │
+│       ↓                                  │
+│  Weighted Final Score                    │
+│    (60% skills + 25% similarity          │
+│     + 15% profile)                       │
+│       ↓                                  │
+│  Rank → Decision → AI Recommendation     │
+│       ↓                                  │
+│  Save to Database + CSV Report           │
+└──────────────────────────────────────────┘
+       ↓
+Review Results (ranked list, score breakdown)
+       ↓
+Shortlist / Compare / Schedule Interview
+       ↓
+Analytics & Export
 ```
 
 ---
 
-# 🏗 Project Architecture
+## AI Scoring Model
 
-```text
-Frontend (Next.js + Tailwind CSS)
-                ↓
-         FastAPI Backend
-                ↓
- Resume Processing Pipeline
-                ↓
-Text Extraction → Cleaning → Skill Matching
-                ↓
-TF-IDF + Cosine Similarity
-                ↓
-Score Calculation & Ranking
-                ↓
-CSV Report Generation
+```
+Final Score = (0.60 × Skill Score) + (0.25 × Similarity Score) + (0.15 × Profile Score)
+```
+
+| Component | Weight | Calculation |
+|-----------|--------|-------------|
+| Skill Score | 60% | Matched required skills / total required skills |
+| Similarity Score | 25% | TF-IDF + cosine similarity (resume vs job description) |
+| Profile Score | 15% | Education (+25), Internships (+30), Projects (+25), Certifications (+20) |
+
+| Score | Decision | Action |
+|-------|----------|--------|
+| ≥ 75% | Shortlisted | Proceed to technical interview |
+| 45–74% | Review | Schedule HR screening call |
+| < 45% | Not Suitable | Archive for future roles |
+
+---
+
+## Architecture
+
+```
+React Dashboard (Vite + Tailwind CSS)
+              ↓ REST API
+       FastAPI Backend (Python + NLP)
+              ↓
+   Resume Processing Pipeline
+   Extract → Clean → Parse → Match → Score → Rank → Recommend
+              ↓
+     Supabase PostgreSQL
+     (jobs, candidates, interviews, resumes)
 ```
 
 ---
 
-# 🛠 Tech Stack
+## Tech Stack
 
-## Backend
-
-* Python
-* FastAPI
-* Uvicorn
-* Pandas
-* NumPy
-* Scikit-learn
-* pdfplumber
-* python-docx
-* TF-IDF
-* Cosine Similarity
+| Layer | Technologies |
+|-------|-------------|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, React Router, TanStack Query, Recharts, Axios |
+| Backend | Python, FastAPI, Uvicorn, Pydantic, Pandas, NumPy |
+| AI / NLP | scikit-learn (TF-IDF, cosine similarity), regex parsing, custom skill dictionary |
+| File Processing | pdfplumber, python-docx |
+| Database | Supabase (PostgreSQL) |
+| Deployment | Vercel (frontend), Render (backend) |
 
 ---
 
-## Frontend
+## Folder Structure
 
-* Next.js
-* TypeScript
-* Tailwind CSS
-* Axios
-* Recharts
-* Framer Motion
-* Lucide React Icons
-
----
-
-# 📁 Full Folder Structure
-
-```text
-Automated-Resume-Screening-Tool/
-│
+```
+Resume_Analyzer/
 ├── backend/
-│   │
 │   ├── api/
-│   │   └── app.py
-│   │
+│   │   ├── app.py              # Main FastAPI app + screening endpoints
+│   │   └── workspace.py        # Jobs, candidates, interviews CRUD
 │   ├── src/
-│   │   ├── text_extractor.py
-│   │   ├── text_cleaner.py
-│   │   ├── skill_matcher.py
-│   │   ├── scorer.py
-│   │   └── report_generator.py
-│   │
-│   ├── uploads/
+│   │   ├── text_extractor.py   # PDF/DOCX/TXT extraction
+│   │   ├── text_cleaner.py     # Text preprocessing
+│   │   ├── resume_parser.py    # Structured profile parsing
+│   │   ├── skill_matcher.py    # Skill extraction & matching
+│   │   ├── matching_engine.py  # TF-IDF scoring + ranking
+│   │   ├── recommendation_engine.py  # AI recommendations
+│   │   ├── screening_service.py      # Screening orchestration
+│   │   ├── report_generator.py     # CSV export
+│   │   └── db/                 # Supabase repository
+│   ├── data_skills.py          # 50+ skill dictionary
 │   ├── requirements.txt
-│   ├── data_skills.py
-│   └── main.py
-│
+│   └── main.py                 # CLI testing helper
 ├── frontend/
-│   ├── app/
-│   ├── public/
-│   ├── package.json
-│   └── ...
-│
-├── resumes/
-│   ├── aditi_python_developer.txt
-│   ├── neha_data_analyst.txt
-│   └── rahul_frontend_developer.txt
-│
-├── outputs/
-│   ├── screening_results.csv
-│   └── shortlisted_candidates.csv
-│
-├── images/
-│   ├── dashboard_home.png
-│   ├── ranked_candidates.png
-│   ├── candidate_score_analytics.png
-│   ├── shortlisted_candidate.png
-│   ├── review_candidate.png
-│   └── not_suitable_candidate.png
-│
-├── docs/
-│
-├── README.md
-├── .gitignore
-└── package-lock.json
+│   ├── src/
+│   │   ├── pages/              # Dashboard, Jobs, Candidates, Analytics, etc.
+│   │   ├── components/         # UI components, layout, upload zone
+│   │   ├── store/              # Workspace context (state management)
+│   │   ├── lib/                # API client, scoring, reports
+│   │   └── data/               # Seed jobs and candidates
+│   ├── public/config.json      # API base URL config
+│   └── package.json
+├── supabase/
+│   └── schema.sql              # Database schema
+├── resumes/                    # Sample resumes for demo
+├── start_backend.ps1
+├── start_frontend.ps1
+├── render.yaml                 # Render deployment blueprint
+├── DEPLOY.md                   # Deployment guide
+├── JURY_PRESENTATION_GUIDE.md  # Jury/viva talking points
+└── README.md
 ```
 
 ---
 
-# 🔬 Virtual Simulation
+## Installation & Setup
 
-Since this is a student project and real ATS data is unavailable, the project uses simulated recruiter workflows.
-
----
-
-## 👨‍💼 How the Simulation Works
-
-### 1. Sample Resume Creation
-
-Sample resumes are created for different candidate types:
-
-* Python Developer
-* Data Analyst
-* Frontend Developer
-
-Each resume contains:
-
-* education
-* skills
-* projects
-* experience
-
----
-
-### 2. Job Description Creation
-
-A recruiter job description is manually entered in the dashboard.
-
-Example:
-
-```text
-Python Developer Intern with knowledge of Python, SQL, FastAPI, Machine Learning, Pandas, NumPy, Scikit-learn, Git, and REST API.
-```
-
----
-
-### 3. Required Skills Input
-
-The recruiter enters required skills dynamically.
-
-Example:
-
-```text
-Python, SQL, FastAPI, Machine Learning, Pandas, NumPy, Scikit-learn, Git, REST API
-```
-
----
-
-### 4. Resume Text Extraction
-
-The system extracts text from:
-
-* PDF resumes
-* DOCX resumes
-* TXT resumes
-
----
-
-### 5. Skill Matching
-
-The system checks:
-
-* matched skills
-* missing skills
-
----
-
-### 6. Similarity Calculation
-
-TF-IDF + cosine similarity compare:
-
-```text
-Resume ↔ Job Description
-```
-
----
-
-### 7. Final Ranking
-
-Final score is calculated using weighted scoring:
-
-```text
-70% Skill Match Score
-30% Resume-JD Similarity
-```
-
----
-
-### 8. Final Decision
-
-```text
-Score ≥ 75% → Shortlisted
-Score ≥ 40% → Review
-Score < 40% → Not Suitable
-```
-
----
-
-# ⚙️ Complete Installation Guide
-
----
-
-# 1️⃣ Clone Repository
+### 1. Clone and enter project
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Automated-Resume-Screening-Tool.git
+git clone <your-repo-url>
+cd Resume_Analyzer
 ```
 
-Move into folder:
-
-```bash
-cd Automated-Resume-Screening-Tool
-```
-
----
-
-# 2️⃣ Create Virtual Environment
-
-Move to backend folder:
+### 2. Backend setup
 
 ```bash
 cd backend
-```
-
----
-
-## Windows
-
-```bash
 python -m venv venv
-```
-
-Activate virtual environment:
-
-```bash
-venv\Scripts\activate
-```
-
----
-
-## Mac/Linux
-
-```bash
-python3 -m venv venv
-```
-
-Activate:
-
-```bash
-source venv/bin/activate
-```
-
----
-
-# 3️⃣ Install Dependencies
-
-Install backend dependencies:
-
-```bash
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Mac/Linux
 pip install -r requirements.txt
 ```
 
----
-
-# 4️⃣ Run FastAPI Backend
+### 3. Run backend
 
 ```bash
 uvicorn api.app:app --reload
 ```
 
-Backend runs on:
+Backend: `http://127.0.0.1:8000` | API docs: `http://127.0.0.1:8000/docs`
 
-```text
-http://127.0.0.1:8000
-```
-
-Swagger API docs:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-# 5️⃣ Run Frontend
-
-Open another terminal.
-
-Move to frontend:
+### 4. Frontend setup
 
 ```bash
 cd frontend
-```
-
-Install frontend dependencies:
-
-```bash
 npm install
-```
-
-Run frontend:
-
-```bash
 npm run dev
 ```
 
-Frontend runs on:
+Frontend: `http://localhost:5173`
 
-```text
-http://localhost:3000
-```
+### 5. Database setup (optional, for production mode)
 
----
+1. Create a Supabase project
+2. Run `supabase/schema.sql` in the SQL Editor
+3. Set environment variables in `backend/.env`:
+   ```
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_SERVICE_KEY=your_service_key
+   ```
 
-# ▶️ Run Complete Pipeline
-
-## Step-by-Step Workflow
-
-1. Start backend server
-2. Start frontend server
-3. Open dashboard
-4. Upload resumes
-5. Enter job description
-6. Enter required skills
-7. Click:
-
-```text
-Analyze & Rank Candidates
-```
-
-8. System processes resumes
-9. Dashboard displays ranking results
-10. Download CSV report
+See [supabase/SETUP.md](supabase/SETUP.md) and [DEPLOY.md](DEPLOY.md) for full deployment instructions.
 
 ---
 
-# 📊 Sample Model Results
+## Quick Start (Demo Mode)
 
-| Rank | Candidate                |  Score | Decision     |
-| ---- | ------------------------ | -----: | ------------ |
-| 1    | Aditi Python Developer   | 76.21% | Shortlisted  |
-| 2    | Neha Data Analyst        | 46.37% | Review       |
-| 3    | Rahul Frontend Developer |  9.61% | Not Suitable |
+1. Start backend and frontend
+2. Open `http://localhost:5173`
+3. Click **"Start demo session"**
+4. Open any job → click **"Run Demo Screening"**
+5. View ranked candidates with scores and AI recommendations
 
----
-
-# 🔑 Key Insights
-
-* Python Developer profile achieved highest score due to strong skill matching.
-* Data Analyst profile matched partially because of missing backend/API skills.
-* Frontend Developer profile scored lowest because job requirements focused on Python and ML.
-* TF-IDF similarity improved ranking accuracy.
-* Skill extraction provided explainable recruiter decisions.
+No database required for demo mode.
 
 ---
 
-# 📄 Generated Outputs
+## Sample Results
 
-The project generates:
-
-```text
-outputs/screening_results.csv
-```
-
-CSV report includes:
-
-* Rank
-* Candidate Name
-* Final Score
-* Decision
-* Skill Score
-* Similarity Score
-* Matched Skills
-* Missing Skills
-* Explanation
+| Rank | Candidate | Score | Decision |
+|------|-----------|------:|----------|
+| 1 | Aditi Python Developer | 76.21% | Shortlisted |
+| 2 | Neha Data Analyst | 46.37% | Review |
+| 3 | Rahul Frontend Developer | 9.61% | Not Suitable |
 
 ---
 
-# 📸 Screenshots
+## Future Improvements
 
-## Dashboard Home
-
-![Dashboard Home](images/dashboard_home.png)
-
----
-
-## Candidate Score Analytics
-
-![Candidate Score Analytics](images/candidate_score_analytics.png)
+- Transformer-based semantic embeddings (BERT / Sentence-BERT)
+- LLM-powered resume parsing
+- Bias and fairness analysis
+- Multi-language resume support
+- PDF report generation
+- Real ATS integrations (LinkedIn, Naukri)
+- Multi-recruiter collaboration
 
 ---
 
-## Ranked Candidates
+## Author
 
-![Ranked Candidates](images/ranked_candidates.png)
-
----
-
-## Shortlisted Candidate
-
-![Shortlisted Candidate](images/shortlisted_candidate.png)
+**Vaidehi Deore**
 
 ---
 
-## Review Candidate
+## License
 
-![Review Candidate](images/review_candidate.png)
-
----
-
-## Not Suitable Candidate
-
-![Not Suitable Candidate](images/not_suitable_candidate.png)
-
----
-
-# 📚 Key Learnings
-
-Through this project, I learned:
-
-* Resume parsing using Python
-* PDF and DOCX text extraction
-* Text preprocessing and cleaning
-* Skill extraction logic
-* TF-IDF vectorization
-* Cosine similarity scoring
-* Weighted scoring systems
-* Candidate ranking logic
-* FastAPI backend development
-* API integration with Next.js
-* Tailwind CSS dashboard development
-* CSV report generation
-* Building an end-to-end AI/NLP project
-
----
-
-# 🚀 Future Improvements
-
-* Drag-and-drop resume upload
-* Recruiter login authentication
-* Database integration
-* Semantic embeddings using transformers
-* Resume parsing using LLMs
-* Candidate filtering by experience
-* PDF report generation
-* Cloud deployment
-* Real ATS integration
-* Bias and fairness analysis
-* AI-generated recruiter recommendations
-
----
-
-# 📅 Proof Building Strategy
-
-## Day 1
-
-* Project setup
-* Folder structure
-* Dependency installation
-
----
-
-## Day 2
-
-* Resume text extraction
-* PDF/DOCX processing
-
----
-
-## Day 3
-
-* Job description matching
-* Skill extraction
-
----
-
-## Day 4
-
-* TF-IDF + cosine similarity
-* Ranking system
-
----
-
-## Day 5
-
-* Dashboard integration
-* CSV report generation
-
----
-
-## Day 6
-
-* Documentation
-* GitHub upload
-* README creation
-* Screenshots
-
----
-
-# 💻 GitHub Topics
-
-```text
-python
-machine-learning
-nlp
-fastapi
-nextjs
-resume-screening
-ats
-hr-tech
-tfidf
-cosine-similarity
-tailwindcss
-portfolio-project
-```
-
----
-
-# 👩‍💻 Author
-
-## Vaidehi Deore
-
-# ⭐ Final Note
-
-This project demonstrates how AI and NLP can automate resume screening workflows and help recruiters make faster, data-driven hiring decisions using modern full-stack technologies.
+This project is built for educational and portfolio purposes.
