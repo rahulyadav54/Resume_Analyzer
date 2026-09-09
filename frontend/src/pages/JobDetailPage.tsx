@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import {
   Download,
   MoreHorizontal,
+  Trash2,
   Upload as UploadIcon,
 } from "lucide-react";
 import { PageHeader, PageBody } from "@/components/layout/PageHeader";
@@ -16,9 +17,16 @@ import { UploadZone } from "@/components/jobs/UploadZone";
 import { MatchScore } from "@/components/candidates/MatchScore";
 import { SkillBadge, StatusBadge } from "@/components/candidates/StatusBadge";
 import { useWorkspace } from "@/store/WorkspaceContext";
-import { downloadResultsCsv, runDemoScreening, screenResumes } from "@/lib/api";
+import {
+  downloadResultsCsv,
+  runDemoScreening,
+  screenResumesInBatches,
+  type BatchProgress,
+} from "@/lib/api";
+import { downloadCandidateReport } from "@/lib/candidateReport";
+import { MAX_RESUMES_PER_JOB, RESUME_BATCH_SIZE } from "@/lib/screeningLimits";
 import { uid } from "@/lib/utils";
-import type { Candidate } from "@/types";
+import type { Candidate, Job } from "@/types";
 
 const tabs = [
   "Overview",
@@ -41,6 +49,10 @@ export function JobDetailPage() {
     ingestScreeningResults,
     addResumeRecords,
     addToast,
+    dbEnabled,
+    demoMode,
+    refreshFromDb,
+    deleteCandidates,
   } = useWorkspace();
   const job = jobs.find((j) => j.id === jobId);
   const [tab, setTab] = useState<Tab>("Candidates");
@@ -50,6 +62,54 @@ export function JobDetailPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [processing, setProcessing] = useState<string[]>([]);
   const [showUpload, setShowUpload] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+
+  const existingCandidateCount = useMemo(
+    () => candidates.filter((c) => c.jobId === jobId).length,
+    [candidates, jobId]
+  );
+
+  const remainingSlots = MAX_RESUMES_PER_JOB - existingCandidateCount;
+
+  const queueBulkFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return;
+
+    const dedupeKey = (file: File) => `${file.name}:${file.size}`;
+    const seen = new Set(pendingFiles.map(dedupeKey));
+    const uniqueIncoming = incoming.filter((file) => {
+      const key = dedupeKey(file);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const combined = [...pendingFiles, ...uniqueIncoming];
+    if (combined.length > remainingSlots) {
+      addToast({
+        title: "Upload limit reached",
+        description: `You can add up to ${remainingSlots} more resumes for this job.`,
+        type: "error",
+      });
+      setPendingFiles(combined.slice(0, remainingSlots));
+      return;
+    }
+
+    setPendingFiles(combined);
+    addToast({
+      title: `${uniqueIncoming.length} file${uniqueIncoming.length === 1 ? "" : "s"} queued`,
+      description: `${combined.length} resume${combined.length === 1 ? "" : "s"} ready for screening`,
+      type: "info",
+    });
+  };
+
+  const startBulkScreening = () => {
+    if (pendingFiles.length === 0) {
+      addToast({ title: "No resumes selected", description: "Add files before screening.", type: "info" });
+      return;
+    }
+    screenMutation.mutate(pendingFiles);
+  };
 
   const jobCandidates = useMemo(() => {
     let list = candidates.filter((c) => c.jobId === jobId);
@@ -73,6 +133,15 @@ export function JobDetailPage() {
 
   const screenMutation = useMutation({
     mutationFn: async (files: File[]) => {
+      if (existingCandidateCount + files.length > MAX_RESUMES_PER_JOB) {
+        throw new Error(
+          `This job has ${existingCandidateCount} candidates. You can add up to ${
+            MAX_RESUMES_PER_JOB - existingCandidateCount
+          } more resumes (max ${MAX_RESUMES_PER_JOB} per job).`
+        );
+      }
+
+      const appendToJob = existingCandidateCount > 0;
       setProcessing(files.map((f) => f.name));
       addResumeRecords(
         files.map((f) => ({
@@ -84,28 +153,46 @@ export function JobDetailPage() {
           status: "analyzing",
         }))
       );
-      return screenResumes({
-        jobDescription: job!.description,
-        requiredSkills: job!.requiredSkills.join(", "),
-        files,
-        jobId: jobId!,
-      });
-    },
-    onSuccess: async (data, files) => {
-      await ingestScreeningResults(
-        jobId!,
-        data.results,
-        files.map((f) => f.name)
+      const data = await screenResumesInBatches(
+        {
+          jobDescription: job!.description,
+          requiredSkills: job!.requiredSkills.join(", "),
+          files,
+          jobId: dbEnabled && !demoMode ? jobId! : undefined,
+          append: appendToJob,
+        },
+        setBatchProgress
       );
+      return { data, files, appendToJob };
+    },
+    onSuccess: async ({ data, files, appendToJob }) => {
+      if (!dbEnabled || demoMode) {
+        await ingestScreeningResults(
+          jobId!,
+          data.results,
+          files.map((f) => f.name),
+          appendToJob
+        );
+      } else {
+        await refreshFromDb();
+        addToast({
+          title: "Analysis completed",
+          description: `${data.results.length} candidates screened and ranked`,
+          type: "success",
+        });
+      }
       setProcessing([]);
+      setBatchProgress(null);
+      setPendingFiles([]);
       setShowUpload(false);
       setTab("Candidates");
     },
-    onError: () => {
+    onError: (error: Error) => {
       setProcessing([]);
+      setBatchProgress(null);
       addToast({
         title: "Resume processing failed",
-        description: "Ensure the FastAPI backend is running on port 8000.",
+        description: error.message || "Please try again with a smaller batch.",
         type: "error",
       });
     },
@@ -174,6 +261,30 @@ export function JobDetailPage() {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   };
 
+  const toggleSelectAll = (candidateIds: string[], checked: boolean) => {
+    if (!checked) {
+      setSelected((s) => s.filter((id) => !candidateIds.includes(id)));
+      return;
+    }
+    setSelected((s) => [...new Set([...s, ...candidateIds])]);
+  };
+
+  const handleDeleteSelected = async (ids: string[]) => {
+    if (ids.length === 0) {
+      addToast({ title: "No candidates selected", description: "Select candidates to delete.", type: "info" });
+      return;
+    }
+    if (
+      !window.confirm(
+        `Delete ${ids.length} candidate${ids.length === 1 ? "" : "s"}? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    await deleteCandidates(ids);
+    setSelected((s) => s.filter((id) => !ids.includes(id)));
+  };
+
   return (
     <>
       <PageHeader
@@ -183,7 +294,7 @@ export function JobDetailPage() {
           <div className="flex items-center gap-2">
             <Badge tone={job.status === "active" ? "success" : "warning"}>{job.status.toUpperCase()}</Badge>
             <Button variant="secondary" size="sm" onClick={() => setShowUpload((v) => !v)}>
-              <UploadIcon size={14} /> Upload Resumes
+              <UploadIcon size={14} /> Bulk Upload
             </Button>
             <Button variant="secondary" size="sm" onClick={exportCsv}>
               <Download size={14} /> Export
@@ -216,9 +327,10 @@ export function JobDetailPage() {
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold">Upload Candidates</h3>
+                  <h3 className="text-sm font-semibold">Bulk Resume Upload</h3>
                   <p className="text-xs text-slate-500">
-                    Upload resumes (PDF/DOCX) or run live AI screening on bundled sample resumes.
+                    Drop files or upload a folder — up to {remainingSlots} more resumes ({RESUME_BATCH_SIZE} per
+                    batch).
                   </p>
                 </div>
                 <Button
@@ -233,13 +345,69 @@ export function JobDetailPage() {
             </CardHeader>
             <CardBody>
               <UploadZone
-                onFiles={(files) => screenMutation.mutate(files)}
+                onFiles={queueBulkFiles}
+                disabled={screenMutation.isPending || remainingSlots === 0}
+                label="Drop resumes or a folder here"
+                hint={`PDF, DOCX, or TXT · ${pendingFiles.length} queued · ${remainingSlots} slots left`}
               />
-              {processing.length > 0 && (
+
+              {pendingFiles.length > 0 && (
+                <div className="mt-4 rounded-lg border border-border bg-white">
+                  <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                    <p className="text-xs font-semibold text-slate-700">
+                      {pendingFiles.length} resume{pendingFiles.length === 1 ? "" : "s"} queued
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={screenMutation.isPending}
+                      onClick={() => setPendingFiles([])}
+                    >
+                      Clear all
+                    </Button>
+                  </div>
+                  <ul className="max-h-40 overflow-y-auto px-3 py-2 text-xs text-slate-600">
+                    {pendingFiles.slice(0, 12).map((file) => (
+                      <li key={`${file.name}-${file.size}`} className="truncate py-0.5">
+                        {file.name}
+                      </li>
+                    ))}
+                    {pendingFiles.length > 12 && (
+                      <li className="py-0.5 text-slate-400">+ {pendingFiles.length - 12} more files</li>
+                    )}
+                  </ul>
+                  <div className="border-t border-border px-3 py-2">
+                    <Button
+                      size="sm"
+                      disabled={screenMutation.isPending}
+                      onClick={startBulkScreening}
+                    >
+                      Screen {pendingFiles.length} Resume{pendingFiles.length === 1 ? "" : "s"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {(processing.length > 0 || batchProgress) && (
                 <div className="mt-3 space-y-1.5">
                   <p className="text-xs font-medium text-slate-600">
-                    Uploading → Extracting text → Analyzing skills → Matching → Ranking…
+                    {batchProgress
+                      ? `Processing batch ${batchProgress.batch} of ${batchProgress.totalBatches} · ${batchProgress.processedFiles}/${batchProgress.totalFiles} resumes`
+                      : "Uploading → Extracting text → Analyzing skills → Matching → Ranking…"}
                   </p>
+                  {batchProgress && (
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-brand-600 transition-all"
+                        style={{
+                          width: `${Math.round(
+                            (batchProgress.processedFiles / batchProgress.totalFiles) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  )}
                   {processing.map((name) => (
                     <div
                       key={name}
@@ -288,6 +456,7 @@ export function JobDetailPage() {
         {tab === "Candidates" && (
           <CandidatesTab
             candidates={jobCandidates}
+            job={job}
             jobId={job.id}
             search={search}
             setSearch={setSearch}
@@ -305,11 +474,19 @@ export function JobDetailPage() {
               }
             }}
             onOpenUpload={() => setShowUpload(true)}
+            onDeleteSelected={() => handleDeleteSelected(selected)}
+            onSelectAll={(checked) => toggleSelectAll(jobCandidates.map((c) => c.id), checked)}
           />
         )}
 
         {tab === "Shortlisted" && (
-          <CandidateTable candidates={shortlisted} jobId={job.id} empty="No shortlisted candidates yet." />
+          <CandidateTable
+            candidates={shortlisted}
+            job={job}
+            jobId={job.id}
+            empty="No shortlisted candidates yet."
+            onDelete={(id) => handleDeleteSelected([id])}
+          />
         )}
 
         {tab === "Interviews" && (
@@ -415,6 +592,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 
 function CandidatesTab({
   candidates,
+  job,
   jobId,
   search,
   setSearch,
@@ -426,8 +604,11 @@ function CandidatesTab({
   toggleSelect,
   onCompare,
   onOpenUpload,
+  onDeleteSelected,
+  onSelectAll,
 }: {
   candidates: Candidate[];
+  job: Job;
   jobId: string;
   search: string;
   setSearch: (v: string) => void;
@@ -439,7 +620,11 @@ function CandidatesTab({
   toggleSelect: (id: string) => void;
   onCompare: () => void;
   onOpenUpload: () => void;
+  onDeleteSelected: () => void;
+  onSelectAll: (checked: boolean) => void;
 }) {
+  const allVisibleSelected =
+    candidates.length > 0 && candidates.every((c) => selected.includes(c.id));
   if (candidates.length === 0 && !search) {
     return (
       <EmptyState
@@ -486,9 +671,19 @@ function CandidatesTab({
             <option value="experience">Sort: Experience</option>
           </select>
         </div>
-        <Button variant="secondary" size="sm" onClick={onCompare} disabled={selected.length < 2}>
-          Compare ({selected.length})
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={onCompare} disabled={selected.length < 2}>
+            Compare ({selected.length})
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={selected.length === 0}
+            onClick={onDeleteSelected}
+          >
+            <Trash2 size={14} /> Delete ({selected.length})
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-[10px] border border-border bg-white shadow-sm">
@@ -496,7 +691,14 @@ function CandidatesTab({
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-border bg-slate-50 text-xs text-slate-500">
               <tr>
-                <th className="px-3 py-2.5 w-8" />
+                <th className="px-3 py-2.5 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={(e) => onSelectAll(e.target.checked)}
+                    aria-label="Select all visible candidates"
+                  />
+                </th>
                 <th className="px-3 py-2.5 font-medium">Rank</th>
                 <th className="px-3 py-2.5 font-medium">Candidate</th>
                 <th className="px-3 py-2.5 font-medium">Match</th>
@@ -547,12 +749,21 @@ function CandidatesTab({
                     <StatusBadge status={c.status} />
                   </td>
                   <td className="px-3 py-3">
-                    <Link
-                      to={`/jobs/${jobId}/candidates/${c.id}`}
-                      className="text-xs font-medium text-brand-600"
-                    >
-                      View
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/jobs/${jobId}/candidates/${c.id}`}
+                        className="text-xs font-medium text-brand-600"
+                      >
+                        View
+                      </Link>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-slate-600 hover:text-brand-700"
+                        onClick={() => downloadCandidateReport(c, job)}
+                      >
+                        Report
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -566,12 +777,16 @@ function CandidatesTab({
 
 function CandidateTable({
   candidates,
+  job,
   jobId,
   empty,
+  onDelete,
 }: {
   candidates: Candidate[];
+  job: Job;
   jobId: string;
   empty: string;
+  onDelete?: (id: string) => void;
 }) {
   if (candidates.length === 0) {
     return <p className="text-sm text-slate-500">{empty}</p>;
@@ -596,9 +811,27 @@ function CandidateTable({
                 <StatusBadge status={c.status} />
               </td>
               <td className="px-4 py-3">
-                <Link to={`/jobs/${jobId}/candidates/${c.id}`} className="text-xs text-brand-600">
-                  View
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link to={`/jobs/${jobId}/candidates/${c.id}`} className="text-xs text-brand-600">
+                    View
+                  </Link>
+                  <button
+                    type="button"
+                    className="text-xs text-slate-600 hover:text-brand-700"
+                    onClick={() => downloadCandidateReport(c, job)}
+                  >
+                    Report
+                  </button>
+                  {onDelete && (
+                    <button
+                      type="button"
+                      className="text-xs text-red-600 hover:text-red-700"
+                      onClick={() => onDelete(c.id)}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}

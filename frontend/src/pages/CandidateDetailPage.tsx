@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Download, Mail } from "lucide-react";
 import { PageHeader, PageBody } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -10,15 +10,18 @@ import { AIInsight, SkillBadge, StatusBadge } from "@/components/candidates/Stat
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/MetricCard";
 import { useWorkspace } from "@/store/WorkspaceContext";
+import { downloadCandidateReport, downloadCandidateReportText } from "@/lib/candidateReport";
 import { getMatchLabel } from "@/lib/scoring";
 import { initials } from "@/lib/utils";
 
 export function CandidateDetailPage() {
   const { jobId, candidateId } = useParams();
+  const navigate = useNavigate();
   const {
     candidates,
     jobs,
     updateCandidateStatus,
+    deleteCandidates,
     scheduleInterview,
     addToast,
   } = useWorkspace();
@@ -128,11 +131,39 @@ Talent Acquisition`;
             >
               Reject
             </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={async () => {
+                if (!window.confirm(`Delete ${candidate.candidate_name}? This cannot be undone.`)) return;
+                await deleteCandidates([candidate.id]);
+                navigate(jobId ? `/jobs/${jobId}` : "/candidates");
+              }}
+            >
+              Delete
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => generateEmail("interview")}>
               <Mail size={14} /> Email
             </Button>
-            <Button size="sm" variant="ghost">
-              <Download size={14} /> Resume
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                downloadCandidateReport(candidate, job);
+                addToast({ title: "Report downloaded", type: "success" });
+              }}
+            >
+              <Download size={14} /> Download Report
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                downloadCandidateReportText(candidate, job);
+                addToast({ title: "Text report downloaded", type: "success" });
+              }}
+            >
+              TXT
             </Button>
           </div>
         </div>

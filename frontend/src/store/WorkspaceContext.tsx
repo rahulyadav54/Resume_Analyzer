@@ -14,7 +14,10 @@ import { uid } from "@/lib/utils";
 import { getApiDisplayUrl, isUsingLocalApi } from "@/lib/api";
 import {
   createJobApi,
+  deleteCandidatesApi,
+  deleteResumesApi,
   fetchWorkspace,
+  rerankJobApi,
   saveScreeningResultsApi,
   scheduleInterviewApi,
   updateCandidateStatusApi,
@@ -41,8 +44,15 @@ type WorkspaceState = {
   refreshFromDb: () => Promise<void>;
   addJob: (job: Omit<Job, "id" | "createdAt">) => Promise<Job>;
   updateJob: (id: string, patch: Partial<Job>) => void;
-  ingestScreeningResults: (jobId: string, results: ScreeningResult[], fileNames?: string[]) => Promise<Candidate[]>;
+  ingestScreeningResults: (
+    jobId: string,
+    results: ScreeningResult[],
+    fileNames?: string[],
+    append?: boolean
+  ) => Promise<Candidate[]>;
   updateCandidateStatus: (id: string, status: CandidateStatus) => Promise<void>;
+  deleteCandidates: (ids: string[]) => Promise<number>;
+  deleteResumes: (ids: string[]) => Promise<number>;
   scheduleInterview: (candidateId: string, jobId: string) => Promise<void>;
   addToast: (toast: Omit<ToastMessage, "id">) => void;
   dismissToast: (id: string) => void;
@@ -234,16 +244,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const ingestScreeningResults = useCallback(
-    async (jobId: string, results: ScreeningResult[], fileNames?: string[]) => {
+    async (jobId: string, results: ScreeningResult[], fileNames?: string[], append = false) => {
       if (dbEnabled && !demoMode) {
-        const saved = await saveScreeningResultsApi(jobId, results, fileNames);
+        await saveScreeningResultsApi(jobId, results, fileNames, append);
+        await rerankJobApi(jobId);
         await refreshFromDb();
         addToast({
           title: "Analysis completed",
-          description: `${saved.length} candidates saved`,
+          description: `${results.length} candidates saved`,
           type: "success",
         });
-        return saved;
+        return results as Candidate[];
       }
 
       const now = new Date().toISOString();
@@ -264,10 +275,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setCandidates((prev) => {
-        const withoutDupes = prev.filter(
+        const base = append ? prev : prev.filter((c) => c.jobId !== jobId);
+        const withoutDupes = base.filter(
           (c) => !(c.jobId === jobId && mapped.some((m) => m.candidate_name === c.candidate_name))
         );
-        return [...mapped, ...withoutDupes];
+        const merged = [...mapped, ...withoutDupes];
+        return merged
+          .filter((c) => c.jobId === jobId)
+          .sort((a, b) => b.final_score - a.final_score)
+          .map((c, i) => ({ ...c, rank: i + 1 }))
+          .concat(merged.filter((c) => c.jobId !== jobId));
       });
 
       setResumes((prev) => [
@@ -312,6 +329,72 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (labels[status]) addToast({ title: labels[status]!, type: "success" });
     },
     [addToast, dbEnabled, demoMode, refreshFromDb]
+  );
+
+  const deleteCandidates = useCallback(
+    async (ids: string[]) => {
+      const uniqueIds = [...new Set(ids.filter(Boolean))];
+      if (uniqueIds.length === 0) return 0;
+
+      if (dbEnabled && !demoMode) {
+        const result = await deleteCandidatesApi(uniqueIds);
+        await refreshFromDb();
+        addToast({
+          title: "Candidates deleted",
+          description: `${result.deleted} removed from the workspace`,
+          type: "success",
+        });
+        return result.deleted;
+      }
+
+      setCandidates((prev) => prev.filter((c) => !uniqueIds.includes(c.id)));
+      setInterviews((prev) => prev.filter((i) => !uniqueIds.includes(i.candidateId)));
+      setResumes((prev) => prev.filter((r) => !r.candidateId || !uniqueIds.includes(r.candidateId)));
+      addToast({
+        title: "Candidates deleted",
+        description: `${uniqueIds.length} removed from this session`,
+        type: "success",
+      });
+      return uniqueIds.length;
+    },
+    [addToast, dbEnabled, demoMode, refreshFromDb]
+  );
+
+  const deleteResumes = useCallback(
+    async (ids: string[]) => {
+      const uniqueIds = [...new Set(ids.filter(Boolean))];
+      if (uniqueIds.length === 0) return 0;
+
+      if (dbEnabled && !demoMode) {
+        const result = await deleteResumesApi(uniqueIds);
+        await refreshFromDb();
+        addToast({
+          title: "Resumes deleted",
+          description: `${result.deleted} removed from the library`,
+          type: "success",
+        });
+        return result.deleted;
+      }
+
+      const linkedCandidateIds = resumes
+        .filter((r) => uniqueIds.includes(r.id) && r.candidateId)
+        .map((r) => r.candidateId as string);
+
+      setResumes((prev) => prev.filter((r) => !uniqueIds.includes(r.id)));
+      if (linkedCandidateIds.length > 0) {
+        const uniqueCandidateIds = [...new Set(linkedCandidateIds)];
+        setCandidates((prev) => prev.filter((c) => !uniqueCandidateIds.includes(c.id)));
+        setInterviews((prev) => prev.filter((i) => !uniqueCandidateIds.includes(i.candidateId)));
+      }
+
+      addToast({
+        title: "Resumes deleted",
+        description: `${uniqueIds.length} removed from this session`,
+        type: "success",
+      });
+      return uniqueIds.length;
+    },
+    [addToast, dbEnabled, demoMode, refreshFromDb, resumes]
   );
 
   const scheduleInterview = useCallback(
@@ -373,6 +456,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     updateJob,
     ingestScreeningResults,
     updateCandidateStatus,
+    deleteCandidates,
+    deleteResumes,
     scheduleInterview,
     addToast,
     dismissToast,

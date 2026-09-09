@@ -1,6 +1,11 @@
 import axios from "axios";
 import type { ScreeningResponse } from "@/types";
 import { getApiBase, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
+import {
+  MAX_FILE_SIZE_MB,
+  MAX_RESUMES_PER_JOB,
+  RESUME_BATCH_SIZE,
+} from "@/lib/screeningLimits";
 
 export {
   getApiBase,
@@ -12,7 +17,7 @@ export {
 
 export const api = axios.create({
   baseURL: getApiBase(),
-  timeout: 120000,
+  timeout: 600000,
 });
 
 export function syncApiClientBaseUrl() {
@@ -46,16 +51,36 @@ export async function extractSkillsFromJd(job_description: string) {
   };
 }
 
+function validateResumeFiles(files: File[]) {
+  if (files.length === 0) {
+    throw new Error("Please select at least one resume.");
+  }
+  if (files.length > MAX_RESUMES_PER_JOB) {
+    throw new Error(`Maximum ${MAX_RESUMES_PER_JOB} resumes allowed per upload.`);
+  }
+
+  const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
+  for (const file of files) {
+    if (file.size > maxBytes) {
+      throw new Error(`${file.name} exceeds ${MAX_FILE_SIZE_MB}MB.`);
+    }
+  }
+}
+
 export async function screenResumes(params: {
   jobDescription: string;
   requiredSkills: string;
   files: File[];
   jobDescriptionFile?: File | null;
   jobId?: string;
+  append?: boolean;
 }) {
+  validateResumeFiles(params.files);
+
   const formData = new FormData();
   formData.append("job_description", params.jobDescription);
   formData.append("required_skills", params.requiredSkills);
+  formData.append("append", String(Boolean(params.append)));
   if (params.jobDescriptionFile) {
     formData.append("job_description_file", params.jobDescriptionFile);
   }
@@ -66,8 +91,76 @@ export async function screenResumes(params: {
 
   const { data } = await api.post("/screen-resumes", formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: 600000,
   });
   return data as ScreeningResponse;
+}
+
+export type BatchProgress = {
+  batch: number;
+  totalBatches: number;
+  processedFiles: number;
+  totalFiles: number;
+};
+
+function chunkFiles<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+export async function screenResumesInBatches(
+  params: {
+    jobDescription: string;
+    requiredSkills: string;
+    files: File[];
+    jobId?: string;
+    /** When true, all batches append to existing candidates instead of replacing on the first batch. */
+    append?: boolean;
+  },
+  onProgress?: (progress: BatchProgress) => void
+) {
+  validateResumeFiles(params.files);
+
+  const batches = chunkFiles(params.files, RESUME_BATCH_SIZE);
+  const allResults: ScreeningResponse["results"] = [];
+  let processedFiles = 0;
+
+  for (let index = 0; index < batches.length; index += 1) {
+    const batch = batches[index];
+    onProgress?.({
+      batch: index + 1,
+      totalBatches: batches.length,
+      processedFiles,
+      totalFiles: params.files.length,
+    });
+
+    const data = await screenResumes({
+      jobDescription: params.jobDescription,
+      requiredSkills: params.requiredSkills,
+      files: batch,
+      jobId: params.jobId,
+      append: params.append ? true : index > 0,
+    });
+
+    allResults.push(...data.results);
+    processedFiles += batch.length;
+  }
+
+  onProgress?.({
+    batch: batches.length,
+    totalBatches: batches.length,
+    processedFiles: params.files.length,
+    totalFiles: params.files.length,
+  });
+
+  return {
+    message: "Resume screening completed successfully",
+    total_candidates: allResults.length,
+    results: allResults,
+  } satisfies Pick<ScreeningResponse, "message" | "total_candidates" | "results">;
 }
 
 export function downloadResultsCsv(

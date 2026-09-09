@@ -53,12 +53,29 @@ export async function scheduleInterviewApi(
 export async function saveScreeningResultsApi(
   jobId: string,
   results: ScreeningResult[],
-  fileNames?: string[]
+  fileNames?: string[],
+  append = false
 ) {
   const { data } = await api.post("/workspace/screening-results", {
     jobId,
     results,
     fileNames,
+    append,
   });
   return data.candidates as Candidate[];
+}
+
+export async function rerankJobApi(jobId: string) {
+  const { data } = await api.post(`/workspace/jobs/${jobId}/rerank`);
+  return data.candidates as Candidate[];
+}
+
+export async function deleteCandidatesApi(ids: string[]) {
+  const { data } = await api.delete("/workspace/candidates", { data: { ids } });
+  return data as { message: string; deleted: number; jobIds: string[] };
+}
+
+export async function deleteResumesApi(ids: string[]) {
+  const { data } = await api.delete("/workspace/resumes", { data: { ids } });
+  return data as { message: string; deleted: number; candidateIds: string[] };
 }

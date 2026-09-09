@@ -184,16 +184,33 @@ def create_job(job: dict[str, Any]) -> dict[str, Any] | None:
     return _job_row_to_api(inserted)
 
 
+def count_job_candidates(job_id: str) -> int:
+    client = get_supabase()
+    if not client:
+        return 0
+
+    result = (
+        client.table("candidates")
+        .select("id", count="exact")
+        .eq("job_id", job_id)
+        .execute()
+    )
+    return int(result.count or 0)
+
+
 def save_screening_results(
     job_id: str,
     results: list[dict[str, Any]],
     file_names: list[str] | None = None,
+    append: bool = False,
 ) -> list[dict[str, Any]] | None:
     client = get_supabase()
     if not client:
         return None
 
-    client.table("candidates").delete().eq("job_id", job_id).execute()
+    if not append:
+        client.table("candidates").delete().eq("job_id", job_id).execute()
+        client.table("resumes").delete().eq("job_id", job_id).execute()
 
     rows = []
     resume_rows = []
@@ -220,6 +237,83 @@ def save_screening_results(
     client.table("candidates").insert(rows).execute()
     client.table("resumes").insert(resume_rows).execute()
     return [_candidate_row_to_api(r) for r in rows]
+
+
+def rerank_job_candidates(job_id: str) -> list[dict[str, Any]] | None:
+    client = get_supabase()
+    if not client:
+        return None
+
+    candidates = (
+        client.table("candidates")
+        .select("*")
+        .eq("job_id", job_id)
+        .order("final_score", desc=True)
+        .execute()
+        .data
+    )
+
+    for index, row in enumerate(candidates, start=1):
+        client.table("candidates").update({"rank": index}).eq("id", row["id"]).execute()
+        row["rank"] = index
+
+    return [_candidate_row_to_api(r) for r in candidates]
+
+
+def delete_candidates(candidate_ids: list[str]) -> dict[str, Any]:
+    client = get_supabase()
+    if not client or not candidate_ids:
+        return {"deleted": 0, "jobIds": []}
+
+    rows = (
+        client.table("candidates")
+        .select("id, job_id")
+        .in_("id", candidate_ids)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        return {"deleted": 0, "jobIds": []}
+
+    ids = [row["id"] for row in rows]
+    job_ids = list({row["job_id"] for row in rows})
+
+    client.table("interviews").delete().in_("candidate_id", ids).execute()
+    client.table("resumes").delete().in_("candidate_id", ids).execute()
+    client.table("candidates").delete().in_("id", ids).execute()
+
+    for job_id in job_ids:
+        rerank_job_candidates(job_id)
+
+    return {"deleted": len(ids), "jobIds": job_ids}
+
+
+def delete_resumes(resume_ids: list[str]) -> dict[str, Any]:
+    client = get_supabase()
+    if not client or not resume_ids:
+        return {"deleted": 0, "candidateIds": []}
+
+    rows = (
+        client.table("resumes")
+        .select("id, candidate_id")
+        .in_("id", resume_ids)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        return {"deleted": 0, "candidateIds": []}
+
+    ids = [row["id"] for row in rows]
+    candidate_ids = [row["candidate_id"] for row in rows if row.get("candidate_id")]
+
+    client.table("resumes").delete().in_("id", ids).execute()
+
+    if candidate_ids:
+        delete_candidates(candidate_ids)
+
+    return {"deleted": len(ids), "candidateIds": candidate_ids}
 
 
 def update_candidate_status(candidate_id: str, status: str) -> dict[str, Any] | None:

@@ -18,3 +18,9 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: MAX_RESUMES_PER_REQUEST
+        value: "50"
+      - key: MAX_RESUMES_TOTAL
+        value: "1000"
+      - key: MAX_FILE_SIZE_MB
+        value: "10"

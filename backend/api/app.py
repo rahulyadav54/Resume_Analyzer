@@ -1,5 +1,6 @@
 import os
 import shutil
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -13,7 +14,14 @@ from pydantic import BaseModel
 from src.text_extractor import extract_resume_text
 from src.skill_matcher import extract_skills_from_jd
 from src.screening_service import screen_resume_files, run_demo_screening, UPLOAD_FOLDER
-from src.db.repository import is_db_enabled, save_screening_results, db_health
+from src.config import MAX_FILE_SIZE_MB, MAX_RESUMES_PER_REQUEST, MAX_RESUMES_TOTAL
+from src.db.repository import (
+    count_job_candidates,
+    db_health,
+    is_db_enabled,
+    rerank_job_candidates,
+    save_screening_results,
+)
 from api.workspace import router as workspace_router
 
 app = FastAPI(
@@ -67,6 +75,11 @@ def home():
             "run_demo": "POST /run-demo",
             "extract_skills": "POST /extract-skills-from-jd",
             "workspace": "GET /workspace",
+        },
+        "limits": {
+            "max_resumes_per_request": MAX_RESUMES_PER_REQUEST,
+            "max_resumes_total": MAX_RESUMES_TOTAL,
+            "max_file_size_mb": MAX_FILE_SIZE_MB,
         },
     }
 
@@ -127,9 +140,28 @@ async def screen_resumes(
     files: list[UploadFile] = File(...),
     job_description_file: Optional[UploadFile] = File(None),
     job_id: Optional[str] = Form(None),
+    append: bool = Form(False),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="Please upload at least one resume.")
+
+    if len(files) > MAX_RESUMES_PER_REQUEST:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {MAX_RESUMES_PER_REQUEST} resumes per request. Upload in batches (up to {MAX_RESUMES_TOTAL} total).",
+        )
+
+    if job_id and is_db_enabled():
+        existing = count_job_candidates(job_id) if append else 0
+        if existing + len(files) > MAX_RESUMES_TOTAL:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"This job already has {existing} candidates. "
+                    f"You can add up to {max(0, MAX_RESUMES_TOTAL - existing)} more "
+                    f"(max {MAX_RESUMES_TOTAL} per job)."
+                ),
+            )
 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -156,15 +188,33 @@ async def screen_resumes(
     ]
 
     saved_paths = []
+    original_names: list[str] = []
+
+    max_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
 
     for file in files:
         if not file.filename:
             continue
 
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename)}"
+        file_path = os.path.join(UPLOAD_FOLDER, safe_name)
+        size = 0
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > max_bytes:
+                    buffer.close()
+                    os.remove(file_path)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"File {file.filename} exceeds {MAX_FILE_SIZE_MB}MB limit.",
+                    )
+                buffer.write(chunk)
         saved_paths.append(file_path)
+        original_names.append(file.filename)
 
     if not saved_paths:
         raise HTTPException(status_code=400, detail="No valid resume files were uploaded.")
@@ -177,8 +227,9 @@ async def screen_resumes(
         )
 
         if job_id and is_db_enabled():
-            file_names = [os.path.basename(path) for path in saved_paths]
-            save_screening_results(job_id, response["results"], file_names)
+            file_names = original_names
+            save_screening_results(job_id, response["results"], file_names, append=append)
+            rerank_job_candidates(job_id)
             response["saved_to_database"] = True
 
         return response
