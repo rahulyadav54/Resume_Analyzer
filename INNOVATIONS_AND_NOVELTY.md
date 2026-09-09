@@ -274,15 +274,26 @@ Supabase (Auth + PostgreSQL)
 
 ---
 
+## Recently Closed Gaps (Now Solved)
+
+| Former Gap | Solution Added |
+|------------|----------------|
+| Too many resumes — partially solved | Express triage (immediate / queue / archive) + batch limit raised to 100 + hours-saved metric |
+| Inconsistent screening — partially solved | Locked scoring rubric v1.0 (60/25/15) embedded in every screening batch |
+| Keyword stuffing — partially addressed | Skills-section-only detection + repeated skill block analysis |
+| Resume fraud — partially addressed | Experience validator (inflated years, title inflation, timeline checks) |
+| Good candidate wrong role — future scope | **Talent Pool** — save strong candidates for future roles |
+| No audit trail — weak | **Audit Trail** page + CSV export + automatic action logging |
+| Hard to compare — partially solved | Radar chart, finalist recommendation, integrity scores, CSV export |
+
 ## Future Scope (Research & Extension)
 
 - Transformer embeddings (BERT / Sentence-BERT) for semantic matching
 - LLM-powered resume parsing (optional layer)
 - Bias audit reports and fairness dashboards
 - Multi-language resume support
-- Talent pool — save rejected candidates for future roles
 - LinkedIn / Naukri API integration
-- PDF hiring audit reports for compliance
+- PDF hiring audit reports for compliance (CSV export available now)
 
 ---
 

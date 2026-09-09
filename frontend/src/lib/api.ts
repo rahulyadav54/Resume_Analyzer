@@ -1,4 +1,5 @@
 import axios from "axios";
+import { buildTriageSummary } from "@/lib/triage";
 import type { JdQuality, ScreeningResponse } from "@/types";
 import { getAuthToken } from "@/lib/auth";
 import { getApiBase, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
@@ -188,10 +189,16 @@ export async function screenResumesInBatches(
     total_candidates: allResults.length,
     jd_quality: jdQuality,
     duplicate_alerts: duplicateAlerts,
+    triage_summary: buildTriageSummary(allResults),
     results: allResults,
   } satisfies Pick<
     ScreeningResponse,
-    "message" | "total_candidates" | "results" | "jd_quality" | "duplicate_alerts"
+    | "message"
+    | "total_candidates"
+    | "results"
+    | "jd_quality"
+    | "duplicate_alerts"
+    | "triage_summary"
   >;
 }
 

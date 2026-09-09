@@ -1,14 +1,20 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from src.audit_service import audit_entries_to_csv, build_audit_entry
 from src.db.repository import (
+    add_to_talent_pool,
+    append_audit_log,
     create_interview,
     create_job,
     db_health,
     delete_candidates,
     delete_resumes,
+    fetch_audit_logs,
+    fetch_talent_pool,
     fetch_workspace,
     is_db_enabled,
+    remove_from_talent_pool,
     rerank_job_candidates,
     save_screening_results,
     update_candidate_status,
@@ -54,6 +60,26 @@ class BulkDeletePayload(BaseModel):
     ids: list[str] = Field(default_factory=list)
 
 
+class TalentPoolPayload(BaseModel):
+    candidateId: str | None = None
+    candidateName: str
+    email: str | None = None
+    sourceJobId: str | None = None
+    sourceJobTitle: str = ""
+    finalScore: float = 0
+    matchedSkills: list[str] = Field(default_factory=list)
+    notes: str = ""
+    actor: str = "Recruiter"
+
+
+class AuditLogPayload(BaseModel):
+    action: str
+    actor: str = "Recruiter"
+    target: str = ""
+    details: str = ""
+    metadata: dict = Field(default_factory=dict)
+
+
 @router.get("/status")
 def workspace_status():
     return db_health()
@@ -62,7 +88,15 @@ def workspace_status():
 @router.get("")
 def get_workspace():
     if not is_db_enabled():
-        return {"dbEnabled": False, "jobs": [], "candidates": [], "interviews": [], "resumes": []}
+        return {
+            "dbEnabled": False,
+            "jobs": [],
+            "candidates": [],
+            "interviews": [],
+            "resumes": [],
+            "talentPool": [],
+            "auditLogs": [],
+        }
 
     data = fetch_workspace()
     return data
@@ -115,6 +149,16 @@ def patch_candidate_status(candidate_id: str, payload: CandidateStatusPayload):
     updated = update_candidate_status(candidate_id, payload.status)
     if not updated:
         raise HTTPException(status_code=404, detail="Candidate not found.")
+
+    append_audit_log(
+        build_audit_entry(
+            action="candidate_status_changed",
+            actor="Recruiter",
+            target=updated["candidate_name"],
+            details=f"Status updated to {payload.status}",
+            metadata={"candidateId": candidate_id, "status": payload.status},
+        )
+    )
     return {"message": "Status updated", "candidate": updated}
 
 
@@ -155,3 +199,64 @@ def rerank_job(job_id: str):
     if ranked is None:
         raise HTTPException(status_code=500, detail="Could not rerank candidates.")
     return {"message": "Candidates reranked", "candidates": ranked}
+
+
+@router.get("/talent-pool")
+def get_talent_pool():
+    return {"talentPool": fetch_talent_pool()}
+
+
+@router.post("/talent-pool")
+def post_talent_pool(payload: TalentPoolPayload):
+    saved = add_to_talent_pool(payload.model_dump())
+    if not saved and is_db_enabled():
+        raise HTTPException(status_code=500, detail="Could not save to talent pool.")
+
+    if saved:
+        append_audit_log(
+            build_audit_entry(
+                action="talent_pool_added",
+                actor=payload.actor,
+                target=payload.candidateName,
+                details="Candidate saved to talent pool for future roles",
+                metadata={"candidateId": payload.candidateId, "sourceJobId": payload.sourceJobId},
+            )
+        )
+    return {"message": "Saved to talent pool", "entry": saved or payload.model_dump()}
+
+
+@router.delete("/talent-pool/{entry_id}")
+def delete_talent_pool_entry(entry_id: str):
+    if is_db_enabled() and not remove_from_talent_pool(entry_id):
+        raise HTTPException(status_code=404, detail="Talent pool entry not found.")
+    return {"message": "Removed from talent pool", "id": entry_id}
+
+
+@router.get("/audit-logs")
+def get_audit_logs():
+    return {"auditLogs": fetch_audit_logs()}
+
+
+@router.post("/audit-logs")
+def post_audit_log(payload: AuditLogPayload):
+    saved = append_audit_log(
+        build_audit_entry(
+            action=payload.action,
+            actor=payload.actor,
+            target=payload.target,
+            details=payload.details,
+            metadata=payload.metadata,
+        )
+    )
+    return {"message": "Audit log recorded", "entry": saved or payload.model_dump()}
+
+
+@router.get("/audit-logs/export")
+def export_audit_logs():
+    entries = fetch_audit_logs(limit=1000)
+    csv_content = audit_entries_to_csv(entries)
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=hiring-audit-trail.csv"},
+    )

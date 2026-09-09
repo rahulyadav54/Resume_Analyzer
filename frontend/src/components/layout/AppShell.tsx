@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { PortalLoader } from "@/components/ui/PortalLoader";
 import { useWorkspace } from "@/store/WorkspaceContext";
 import { cn } from "@/lib/utils";
 
@@ -17,11 +18,7 @@ export function AppShell() {
   }
 
   if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas">
-        <p className="text-sm text-slate-500">Loading recruiter portal…</p>
-      </div>
-    );
+    return <PortalLoader />;
   }
 
   if (!authenticated) {

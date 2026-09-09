@@ -9,6 +9,8 @@ import {
   FolderOpen,
   FileStack,
   SlidersHorizontal,
+  Archive,
+  Shield,
   HelpCircle,
   LogOut,
   X,
@@ -27,7 +29,9 @@ const mainNav = [
 
 const workspaceNav = [
   { to: "/resumes", label: "Resume Library", icon: FolderOpen },
+  { to: "/talent-pool", label: "Talent Pool", icon: Archive },
   { to: "/templates", label: "Job Templates", icon: FileStack },
+  { to: "/audit-trail", label: "Audit Trail", icon: Shield },
   { to: "/settings/ai", label: "AI Settings", icon: SlidersHorizontal },
 ];
 

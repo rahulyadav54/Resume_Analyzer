@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 
 from src.text_extractor import extract_resume_text
@@ -11,6 +12,8 @@ from src.integrity_checker import check_resume_integrity
 from src.interview_questions import generate_interview_questions
 from src.duplicate_detector import extract_contact_fingerprint, find_duplicate_warning
 from src.jd_analyzer import analyze_job_description
+from src.scoring_rubric import build_scoring_rubric
+from src.triage_engine import build_triage_summary
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 RESUME_FOLDER = BASE_DIR / "resumes"
@@ -107,9 +110,11 @@ def screen_resume_files(
         skills_list = DEFAULT_REQUIRED_SKILLS
 
     jd_quality = analyze_job_description(jd_text, skills_list)
+    scoring_rubric = build_scoring_rubric()
     candidates = []
     seen_for_duplicates: list[dict] = []
     duplicate_alerts: list[dict] = []
+    started_at = time.perf_counter()
 
     for file_path in file_paths:
         resume_text = extract_resume_text(file_path)
@@ -166,7 +171,16 @@ def screen_resume_files(
         candidates.append(_finalize_candidate(result, resume_text, bias_blind_mode))
 
     ranked = rank_candidates(candidates)
+    for candidate in ranked:
+        breakdown = candidate.get("matching_breakdown") or {}
+        candidate["matching_breakdown"] = {
+            **breakdown,
+            "scoring_rubric": scoring_rubric,
+        }
+
     report_path = save_csv_report(ranked)
+    elapsed_seconds = round(time.perf_counter() - started_at, 2)
+    triage = build_triage_summary(ranked)
 
     return {
         "message": "Resume screening completed successfully",
@@ -177,6 +191,13 @@ def screen_resume_files(
         "jd_quality": jd_quality,
         "bias_blind_mode": bias_blind_mode,
         "duplicate_alerts": duplicate_alerts,
+        "scoring_rubric": scoring_rubric,
+        "triage_summary": triage,
+        "screening_stats": {
+            "processed_count": len(ranked),
+            "elapsed_seconds": elapsed_seconds,
+            "avg_seconds_per_resume": round(elapsed_seconds / max(len(ranked), 1), 2),
+        },
         "results": ranked,
     }
 

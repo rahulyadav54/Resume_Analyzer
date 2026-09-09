@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Download, Mail } from "lucide-react";
+import { Archive, Download, Mail } from "lucide-react";
 import { PageHeader, PageBody } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -25,6 +25,8 @@ export function CandidateDetailPage() {
     scheduleInterview,
     addToast,
     recruiter,
+    saveToTalentPool,
+    talentPool,
   } = useWorkspace();
   const candidate = candidates.find((c) => c.id === candidateId);
   const job = jobs.find((j) => j.id === jobId || j.id === candidate?.jobId);
@@ -65,6 +67,8 @@ export function CandidateDetailPage() {
       </>
     );
   }
+
+  const inTalentPool = talentPool.some((e) => e.candidateId === candidate.id);
 
   const generateEmail = (kind: string) => {
     const body = `Hi ${candidate.candidate_name.split(" ")[0]},
@@ -124,6 +128,15 @@ ${recruiter?.department ?? "Talent Acquisition"}`;
               onClick={() => scheduleInterview(candidate.id, candidate.jobId)}
             >
               Move to Interview
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={inTalentPool}
+              onClick={() => saveToTalentPool(candidate)}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              {inTalentPool ? "In talent pool" : "Save to talent pool"}
             </Button>
             <Button
               size="sm"

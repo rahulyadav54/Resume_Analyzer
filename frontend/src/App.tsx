@@ -17,6 +17,8 @@ import { TemplatesPage } from "@/pages/TemplatesPage";
 import { AISettingsPage } from "@/pages/AISettingsPage";
 import { HelpPage } from "@/pages/HelpPage";
 import { ComparePage } from "@/pages/ComparePage";
+import { TalentPoolPage } from "@/pages/TalentPoolPage";
+import { AuditTrailPage } from "@/pages/AuditTrailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +56,8 @@ export default function App() {
               <Route path="/shortlisted" element={<ShortlistedPage />} />
               <Route path="/interviews" element={<InterviewsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/talent-pool" element={<TalentPoolPage />} />
+              <Route path="/audit-trail" element={<AuditTrailPage />} />
               <Route path="/resumes" element={<ResumeLibraryPage />} />
               <Route path="/templates" element={<TemplatesPage />} />
               <Route path="/settings/ai" element={<AISettingsPage />} />

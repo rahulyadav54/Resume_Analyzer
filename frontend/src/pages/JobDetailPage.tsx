@@ -27,7 +27,7 @@ import {
 import { downloadCandidateReport } from "@/lib/candidateReport";
 import { MAX_RESUMES_PER_JOB, RESUME_BATCH_SIZE } from "@/lib/screeningLimits";
 import { uid } from "@/lib/utils";
-import type { Candidate, JdQuality, Job } from "@/types";
+import type { Candidate, JdQuality, Job, TriageSummary } from "@/types";
 
 const tabs = [
   "Overview",
@@ -68,6 +68,7 @@ export function JobDetailPage() {
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const [jdQuality, setJdQuality] = useState<JdQuality | null>(null);
   const [screeningAlerts, setScreeningAlerts] = useState<string[]>([]);
+  const [triageSummary, setTriageSummary] = useState<TriageSummary | null>(null);
 
   useEffect(() => {
     if (!job?.description) return;
@@ -179,6 +180,7 @@ export function JobDetailPage() {
     },
     onSuccess: async ({ data, files, appendToJob }) => {
       if (data.jd_quality) setJdQuality(data.jd_quality);
+      if (data.triage_summary) setTriageSummary(data.triage_summary);
       setScreeningAlerts((data.duplicate_alerts ?? []).map((a) => a.message));
       if (!dbEnabled || demoMode) {
         await ingestScreeningResults(
@@ -222,6 +224,7 @@ export function JobDetailPage() {
       }),
     onSuccess: async (data) => {
       if (data.jd_quality) setJdQuality(data.jd_quality);
+      if (data.triage_summary) setTriageSummary(data.triage_summary);
       setScreeningAlerts((data.duplicate_alerts ?? []).map((a) => a.message));
       const fileNames = data.results.map((r) => `${r.candidate_name.replace(/\s+/g, "_")}.txt`);
       await ingestScreeningResults(jobId!, data.results, fileNames);
@@ -339,6 +342,35 @@ export function JobDetailPage() {
           ))}
         </div>
 
+        {triageSummary && (
+          <div className="mb-4 grid gap-3 sm:grid-cols-4">
+            <Card className="border-emerald-200 bg-emerald-50/40">
+              <CardBody className="p-4">
+                <p className="text-xs font-medium text-emerald-700">Immediate review</p>
+                <p className="text-2xl font-semibold text-slate-900">{triageSummary.immediate_count}</p>
+              </CardBody>
+            </Card>
+            <Card className="border-amber-200 bg-amber-50/40">
+              <CardBody className="p-4">
+                <p className="text-xs font-medium text-amber-700">Review queue</p>
+                <p className="text-2xl font-semibold text-slate-900">{triageSummary.queue_count}</p>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody className="p-4">
+                <p className="text-xs font-medium text-slate-500">Auto-archived</p>
+                <p className="text-2xl font-semibold text-slate-900">{triageSummary.archive_count}</p>
+              </CardBody>
+            </Card>
+            <Card className="border-brand-200 bg-brand-50/40">
+              <CardBody className="p-4">
+                <p className="text-xs font-medium text-brand-700">Hours saved</p>
+                <p className="text-2xl font-semibold text-slate-900">{triageSummary.estimated_hours_saved}h</p>
+              </CardBody>
+            </Card>
+          </div>
+        )}
+
         {screeningAlerts.length > 0 && (
           <div className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p className="font-medium">Duplicate applications detected</p>
@@ -349,6 +381,11 @@ export function JobDetailPage() {
             </ul>
           </div>
         )}
+
+        <div className="mb-4 rounded-[10px] border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+          <strong>Standardized scoring rubric v1.0</strong> — every candidate uses the same locked 60/25/15
+          weights for consistent, auditable screening.
+        </div>
 
         {aiSettings.biasBlindMode && (
           <div className="mb-4 rounded-[10px] border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-800">

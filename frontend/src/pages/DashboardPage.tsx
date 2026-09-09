@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { MetricCard, EmptyState } from "@/components/ui/MetricCard";
 import { Badge } from "@/components/ui/Badge";
 import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
+import { PortalLoader } from "@/components/ui/PortalLoader";
 import { useWorkspace } from "@/store/WorkspaceContext";
 import { formatRelativeDate } from "@/lib/utils";
 
@@ -81,7 +82,7 @@ export function DashboardPage() {
         </div>
 
         {dbLoading ? (
-          <p className="text-sm text-slate-500">Loading workspace…</p>
+          <PortalLoader fullscreen={false} title="Syncing workspace" />
         ) : activeJobs.length === 0 ? (
           <EmptyState
             title="No active jobs"

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type {
   AISettings,
+  AuditLogEntry,
   Candidate,
   CandidateStatus,
   Interview,
@@ -8,6 +9,7 @@ import type {
   RecruiterUser,
   ResumeRecord,
   ScreeningResult,
+  TalentPoolEntry,
   ToastMessage,
 } from "@/types";
 import {
@@ -21,10 +23,14 @@ import { DEFAULT_WEIGHTS } from "@/lib/scoring";
 import { uid } from "@/lib/utils";
 import { getApiDisplayUrl, isUsingLocalApi } from "@/lib/api";
 import {
+  addToTalentPoolApi,
   createJobApi,
   deleteCandidatesApi,
   deleteResumesApi,
+  exportAuditLogsApi,
   fetchWorkspace,
+  postAuditLogApi,
+  removeFromTalentPoolApi,
   rerankJobApi,
   saveScreeningResultsApi,
   scheduleInterviewApi,
@@ -38,6 +44,8 @@ type WorkspaceState = {
   candidates: Candidate[];
   interviews: Interview[];
   resumes: ResumeRecord[];
+  talentPool: TalentPoolEntry[];
+  auditLogs: AuditLogEntry[];
   aiSettings: AISettings;
   toasts: ToastMessage[];
   recruiter: RecruiterUser | null;
@@ -68,9 +76,38 @@ type WorkspaceState = {
   dismissToast: (id: string) => void;
   updateAISettings: (patch: Partial<AISettings>) => void;
   addResumeRecords: (records: ResumeRecord[]) => void;
+  saveToTalentPool: (candidate: Candidate, notes?: string) => Promise<void>;
+  removeFromTalentPool: (entryId: string) => Promise<void>;
+  logAudit: (
+    action: string,
+    target: string,
+    details: string,
+    metadata?: Record<string, unknown>
+  ) => Promise<void>;
+  exportAuditTrail: () => Promise<void>;
 };
 
 const SETTINGS_KEY = "ai-recruit-settings-v2";
+const TALENT_POOL_KEY = "ai-recruit-talent-pool";
+const AUDIT_LOG_KEY = "ai-recruit-audit-logs";
+
+function loadTalentPool(): TalentPoolEntry[] {
+  try {
+    const raw = localStorage.getItem(TALENT_POOL_KEY);
+    return raw ? (JSON.parse(raw) as TalentPoolEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadAuditLogs(): AuditLogEntry[] {
+  try {
+    const raw = localStorage.getItem(AUDIT_LOG_KEY);
+    return raw ? (JSON.parse(raw) as AuditLogEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 const defaultAISettings: AISettings = {
   strongMatchMin: 90,
@@ -106,6 +143,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
+  const [talentPool, setTalentPool] = useState<TalentPoolEntry[]>(() => loadTalentPool());
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => loadAuditLogs());
   const [aiSettings, setAISettings] = useState<AISettings>(initial.aiSettings);
   const [recruiter, setRecruiter] = useState<RecruiterUser | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
@@ -121,6 +160,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       JSON.stringify({ aiSettings, demoMode })
     );
   }, [aiSettings, demoMode]);
+
+  useEffect(() => {
+    localStorage.setItem(TALENT_POOL_KEY, JSON.stringify(talentPool));
+  }, [talentPool]);
+
+  useEffect(() => {
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(auditLogs.slice(0, 500)));
+  }, [auditLogs]);
 
   useEffect(() => {
     let active = true;
@@ -198,6 +245,140 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
+  const logAudit = useCallback(
+    async (
+      action: string,
+      target: string,
+      details: string,
+      metadata?: Record<string, unknown>
+    ) => {
+      const entry: AuditLogEntry = {
+        id: uid("audit"),
+        action,
+        actor: recruiter?.name ?? "Recruiter",
+        target,
+        details,
+        metadata,
+        createdAt: new Date().toISOString(),
+      };
+
+      setAuditLogs((prev) => [entry, ...prev].slice(0, 500));
+
+      if (dbEnabled && !demoMode) {
+        try {
+          await postAuditLogApi({
+            action,
+            actor: entry.actor,
+            target,
+            details,
+            metadata,
+          });
+        } catch {
+          /* keep local audit trail */
+        }
+      }
+    },
+    [dbEnabled, demoMode, recruiter?.name]
+  );
+
+  const saveToTalentPool = useCallback(
+    async (candidate: Candidate, notes = "") => {
+      const job = jobs.find((j) => j.id === candidate.jobId);
+      const payload = {
+        candidateId: candidate.id,
+        candidateName: candidate.candidate_name,
+        email: candidate.email,
+        sourceJobId: candidate.jobId,
+        sourceJobTitle: job?.title ?? "Unknown role",
+        finalScore: candidate.final_score,
+        matchedSkills: candidate.matched_skills,
+        notes,
+        actor: recruiter?.name ?? "Recruiter",
+      };
+
+      let saved: TalentPoolEntry;
+      if (dbEnabled && !demoMode) {
+        try {
+          saved = await addToTalentPoolApi(payload);
+        } catch {
+          saved = { id: uid("pool"), savedAt: new Date().toISOString(), ...payload, notes };
+        }
+      } else {
+        saved = { id: uid("pool"), savedAt: new Date().toISOString(), ...payload, notes };
+      }
+
+      setTalentPool((prev) => {
+        if (prev.some((p) => p.candidateId === candidate.id)) return prev;
+        return [saved, ...prev];
+      });
+
+      await logAudit(
+        "talent_pool_added",
+        candidate.candidate_name,
+        `Saved to talent pool from ${job?.title ?? "role"}`
+      );
+
+      addToast({
+        title: "Saved to talent pool",
+        description: `${candidate.candidate_name} can be matched to future roles.`,
+        type: "success",
+      });
+    },
+    [addToast, dbEnabled, demoMode, jobs, logAudit, recruiter?.name]
+  );
+
+  const removeFromTalentPool = useCallback(
+    async (entryId: string) => {
+      const entry = talentPool.find((e) => e.id === entryId);
+      setTalentPool((prev) => prev.filter((e) => e.id !== entryId));
+
+      if (dbEnabled && !demoMode) {
+        try {
+          await removeFromTalentPoolApi(entryId);
+        } catch {
+          /* local state already updated */
+        }
+      }
+
+      if (entry) {
+        await logAudit("talent_pool_removed", entry.candidateName, "Removed from talent pool");
+      }
+    },
+    [dbEnabled, demoMode, logAudit, talentPool]
+  );
+
+  const exportAuditTrail = useCallback(async () => {
+    if (dbEnabled && !demoMode) {
+      try {
+        const blob = await exportAuditLogsApi();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "hiring-audit-trail.csv";
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      } catch {
+        /* fall through to local export */
+      }
+    }
+
+    const header = "timestamp,action,actor,target,details\n";
+    const rows = auditLogs
+      .map(
+        (e) =>
+          `${e.createdAt},${e.action},${e.actor},${e.target},"${e.details.replace(/"/g, "'")}"`
+      )
+      .join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "hiring-audit-trail.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [auditLogs, dbEnabled, demoMode]);
+
   const refreshFromDb = useCallback(async () => {
     setDbLoading(true);
     let lastError: unknown;
@@ -209,6 +390,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         setCandidates(data.candidates);
         setInterviews(data.interviews);
         setResumes(data.resumes);
+        if (data.talentPool.length > 0) setTalentPool(data.talentPool);
+        if (data.auditLogs.length > 0) setAuditLogs(data.auditLogs);
         setDbLoading(false);
         return;
       } catch (error) {
@@ -362,6 +545,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         await saveScreeningResultsApi(jobId, results, fileNames, append);
         await rerankJobApi(jobId);
         await refreshFromDb();
+        await logAudit(
+          "batch_screening_completed",
+          `Job ${jobId}`,
+          `${results.length} candidates screened and ranked`
+        );
         addToast({
           title: "Analysis completed",
           description: `${results.length} candidates saved`,
@@ -421,16 +609,27 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       });
       return mapped;
     },
-    [addToast, dbEnabled, demoMode, refreshFromDb]
+    [addToast, dbEnabled, demoMode, logAudit, refreshFromDb]
   );
 
   const updateCandidateStatus = useCallback(
     async (id: string, status: CandidateStatus) => {
+      const candidate = candidates.find((c) => c.id === id);
+
       if (dbEnabled && !demoMode) {
         await updateCandidateStatusApi(id, status);
         await refreshFromDb();
       } else {
         setCandidates((c) => c.map((x) => (x.id === id ? { ...x, status } : x)));
+      }
+
+      if (candidate) {
+        await logAudit(
+          "candidate_status_changed",
+          candidate.candidate_name,
+          `Status changed to ${status}`,
+          { candidateId: id, status }
+        );
       }
 
       const labels: Partial<Record<CandidateStatus, string>> = {
@@ -441,7 +640,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       };
       if (labels[status]) addToast({ title: labels[status]!, type: "success" });
     },
-    [addToast, dbEnabled, demoMode, refreshFromDb]
+    [addToast, candidates, dbEnabled, demoMode, logAudit, refreshFromDb]
   );
 
   const deleteCandidates = useCallback(
@@ -553,6 +752,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     candidates,
     interviews,
     resumes,
+    talentPool,
+    auditLogs,
     aiSettings,
     toasts,
     recruiter,
@@ -578,6 +779,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     dismissToast,
     updateAISettings,
     addResumeRecords,
+    saveToTalentPool,
+    removeFromTalentPool,
+    logAudit,
+    exportAuditTrail,
   };
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

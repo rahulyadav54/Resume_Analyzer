@@ -46,3 +46,92 @@ select {
   outline: 2px solid var(--color-brand-600);
   outline-offset: 2px;
 }
+
+@keyframes portal-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes portal-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 10px 25px rgba(79, 70, 229, 0.25);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 14px 32px rgba(79, 70, 229, 0.35);
+  }
+}
+
+@keyframes portal-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes portal-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15%,
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes portal-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.portal-loader-ring {
+  animation: portal-ring-spin 3s linear infinite;
+}
+
+.portal-loader-ring-delay {
+  animation-duration: 4.5s;
+  animation-direction: reverse;
+}
+
+.portal-loader-ring-delay-2 {
+  animation-duration: 6s;
+}
+
+.portal-loader-pulse {
+  animation: portal-pulse 2s ease-in-out infinite;
+}
+
+.portal-loader-bar {
+  width: 45%;
+  animation: portal-bar 1.6s ease-in-out infinite;
+}
+
+.portal-loader-fade {
+  animation: portal-fade 1.8s ease-in-out;
+}
+
+.portal-loader-dot {
+  animation: portal-dot 1.2s ease-in-out infinite;
+}

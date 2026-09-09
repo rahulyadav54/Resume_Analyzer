@@ -175,11 +175,16 @@ def fetch_workspace() -> dict[str, Any] | None:
         for r in client.table("resumes").select("*").order("uploaded_at", desc=True).execute().data
     ]
 
+    talent_pool = fetch_talent_pool()
+    audit_logs = fetch_audit_logs()
+
     return {
         "jobs": jobs,
         "candidates": candidates,
         "interviews": interviews,
         "resumes": resumes,
+        "talentPool": talent_pool,
+        "auditLogs": audit_logs,
         "dbEnabled": True,
     }
 
@@ -368,6 +373,131 @@ def create_interview(
     inserted = client.table("interviews").insert(row).execute().data[0]
     update_candidate_status(candidate_id, "interview")
     return _interview_row_to_api(inserted)
+
+
+def _talent_pool_row_to_api(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "candidateId": row.get("candidate_id"),
+        "candidateName": row["candidate_name"],
+        "email": row.get("email"),
+        "sourceJobId": row.get("source_job_id"),
+        "sourceJobTitle": row.get("source_job_title") or "",
+        "finalScore": float(row.get("final_score") or 0),
+        "matchedSkills": row.get("matched_skills") or [],
+        "notes": row.get("notes") or "",
+        "savedAt": row["saved_at"],
+    }
+
+
+def _audit_row_to_api(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "action": row["action"],
+        "actor": row["actor"],
+        "target": row["target"],
+        "details": row["details"],
+        "metadata": row.get("metadata") or {},
+        "createdAt": row["created_at"],
+    }
+
+
+def fetch_talent_pool() -> list[dict[str, Any]]:
+    client = get_supabase()
+    if not client:
+        return []
+
+    try:
+        rows = (
+            client.table("talent_pool")
+            .select("*")
+            .order("saved_at", desc=True)
+            .execute()
+            .data
+            or []
+        )
+        return [_talent_pool_row_to_api(row) for row in rows]
+    except Exception:
+        return []
+
+
+def add_to_talent_pool(entry: dict[str, Any]) -> dict[str, Any] | None:
+    client = get_supabase()
+    if not client:
+        return None
+
+    row = {
+        "id": entry.get("id") or str(uuid4()),
+        "candidate_id": entry.get("candidateId"),
+        "candidate_name": entry["candidateName"],
+        "email": entry.get("email"),
+        "source_job_id": entry.get("sourceJobId"),
+        "source_job_title": entry.get("sourceJobTitle") or "",
+        "final_score": entry.get("finalScore") or 0,
+        "matched_skills": entry.get("matchedSkills") or [],
+        "notes": entry.get("notes") or "",
+        "saved_at": entry.get("savedAt") or _now_iso(),
+    }
+
+    try:
+        inserted = client.table("talent_pool").insert(row).execute().data[0]
+        return _talent_pool_row_to_api(inserted)
+    except Exception:
+        return None
+
+
+def remove_from_talent_pool(entry_id: str) -> bool:
+    client = get_supabase()
+    if not client:
+        return False
+
+    try:
+        client.table("talent_pool").delete().eq("id", entry_id).execute()
+        return True
+    except Exception:
+        return False
+
+
+def fetch_audit_logs(limit: int = 200) -> list[dict[str, Any]]:
+    client = get_supabase()
+    if not client:
+        return []
+
+    try:
+        rows = (
+            client.table("audit_logs")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+            .data
+            or []
+        )
+        return [_audit_row_to_api(row) for row in rows]
+    except Exception:
+        return []
+
+
+def append_audit_log(entry: dict[str, Any]) -> dict[str, Any] | None:
+    client = get_supabase()
+    if not client:
+        return None
+
+    row = {
+        "id": entry.get("id") or str(uuid4()),
+        "action": entry["action"],
+        "actor": entry.get("actor") or "system",
+        "target": entry.get("target") or "",
+        "details": entry.get("details") or "",
+        "metadata": entry.get("metadata") or {},
+        "created_at": entry.get("createdAt") or _now_iso(),
+    }
+
+    try:
+        inserted = client.table("audit_logs").insert(row).execute().data[0]
+        return _audit_row_to_api(inserted)
+    except Exception:
+        return None
 
 
 def db_health() -> dict[str, Any]:

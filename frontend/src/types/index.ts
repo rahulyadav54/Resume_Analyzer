@@ -38,6 +38,21 @@ export type Recommendation = {
   ai_explanation: string;
 };
 
+export type ScoringRubric = {
+  rubric_version: string;
+  consistency_mode: string;
+  locked_weights: {
+    skill_weight: number;
+    similarity_weight: number;
+    profile_weight: number;
+  };
+  decision_thresholds: {
+    shortlist_min: number;
+    review_min: number;
+  };
+  summary: string;
+};
+
 export type MatchingBreakdown = {
   skill_weight: number;
   similarity_weight: number;
@@ -45,6 +60,50 @@ export type MatchingBreakdown = {
   skill_contribution: number;
   similarity_contribution: number;
   profile_contribution: number;
+  scoring_rubric?: ScoringRubric;
+};
+
+export type TriageSummary = {
+  total_screened: number;
+  immediate_review: string[];
+  queue_review: string[];
+  auto_archive: string[];
+  integrity_review: string[];
+  immediate_count: number;
+  queue_count: number;
+  archive_count: number;
+  integrity_flag_count: number;
+  estimated_hours_saved: number;
+  summary: string;
+};
+
+export type ScreeningStats = {
+  processed_count: number;
+  elapsed_seconds: number;
+  avg_seconds_per_resume: number;
+};
+
+export type TalentPoolEntry = {
+  id: string;
+  candidateId?: string;
+  candidateName: string;
+  email?: string;
+  sourceJobId?: string;
+  sourceJobTitle: string;
+  finalScore: number;
+  matchedSkills: string[];
+  notes: string;
+  savedAt: string;
+};
+
+export type AuditLogEntry = {
+  id: string;
+  action: string;
+  actor: string;
+  target: string;
+  details: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type IntegrityFlag = {
@@ -131,6 +190,9 @@ export type ScreeningResponse = {
   jd_quality?: JdQuality;
   bias_blind_mode?: boolean;
   duplicate_alerts?: Array<{ candidate_name: string; message: string }>;
+  scoring_rubric?: ScoringRubric;
+  triage_summary?: TriageSummary;
+  screening_stats?: ScreeningStats;
   results: ScreeningResult[];
 };
 

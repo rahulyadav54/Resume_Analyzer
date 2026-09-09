@@ -1,5 +1,14 @@
 import { api } from "@/lib/api";
-import type { Candidate, CandidateStatus, Interview, Job, ResumeRecord, ScreeningResult } from "@/types";
+import type {
+  AuditLogEntry,
+  Candidate,
+  CandidateStatus,
+  Interview,
+  Job,
+  ResumeRecord,
+  ScreeningResult,
+  TalentPoolEntry,
+} from "@/types";
 
 export type WorkspaceData = {
   dbEnabled: boolean;
@@ -7,6 +16,8 @@ export type WorkspaceData = {
   candidates: Candidate[];
   interviews: Interview[];
   resumes: ResumeRecord[];
+  talentPool: TalentPoolEntry[];
+  auditLogs: AuditLogEntry[];
 };
 
 export async function fetchWorkspace(): Promise<WorkspaceData> {
@@ -17,6 +28,8 @@ export async function fetchWorkspace(): Promise<WorkspaceData> {
     candidates: data.candidates ?? [],
     interviews: data.interviews ?? [],
     resumes: data.resumes ?? [],
+    talentPool: data.talentPool ?? [],
+    auditLogs: data.auditLogs ?? [],
   };
 }
 
@@ -78,4 +91,32 @@ export async function deleteCandidatesApi(ids: string[]) {
 export async function deleteResumesApi(ids: string[]) {
   const { data } = await api.delete("/workspace/resumes", { data: { ids } });
   return data as { message: string; deleted: number; candidateIds: string[] };
+}
+
+export async function addToTalentPoolApi(
+  entry: Omit<TalentPoolEntry, "id" | "savedAt"> & { actor?: string }
+) {
+  const { data } = await api.post("/workspace/talent-pool", entry);
+  return data.entry as TalentPoolEntry;
+}
+
+export async function removeFromTalentPoolApi(id: string) {
+  const { data } = await api.delete(`/workspace/talent-pool/${id}`);
+  return data;
+}
+
+export async function postAuditLogApi(entry: {
+  action: string;
+  actor?: string;
+  target?: string;
+  details?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const { data } = await api.post("/workspace/audit-logs", entry);
+  return data.entry as AuditLogEntry;
+}
+
+export async function exportAuditLogsApi() {
+  const { data } = await api.get("/workspace/audit-logs/export", { responseType: "blob" });
+  return data as Blob;
 }

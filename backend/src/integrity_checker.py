@@ -1,3 +1,6 @@
+from src.experience_validator import validate_experience
+
+
 def _evidence_text(profile: dict) -> str:
     parts = [
         " ".join(profile.get("projects") or []),
@@ -67,6 +70,19 @@ def check_resume_integrity(
             "details": unverified_skills[:5],
         })
 
+    experience_validation = validate_experience(resume_text, profile, extracted_skills)
+    flags.extend(experience_validation["flags"])
+
+    repeated_skill_lines = lower_resume.count("skills") + lower_resume.count("technologies")
+    unique_skill_ratio = len(set(extracted_skills)) / max(len(extracted_skills), 1)
+    if skill_count >= 10 and repeated_skill_lines >= 3 and unique_skill_ratio < 0.7:
+        flags.append({
+            "type": "keyword_stuffing",
+            "severity": "high",
+            "message": "Repeated skill blocks suggest keyword stuffing",
+            "details": [],
+        })
+
     severity_rank = {"high": 3, "medium": 2, "low": 1}
     max_severity = max((severity_rank.get(f["severity"], 0) for f in flags), default=0)
     integrity_score = max(0, 100 - len(flags) * 15 - max_severity * 10)
@@ -78,6 +94,8 @@ def check_resume_integrity(
         "flag_count": len(flags),
         "flags": flags,
         "unverified_skills": unverified_skills[:10],
+        "years_claimed": experience_validation.get("years_claimed") or [],
+        "experience_evidence_count": experience_validation.get("experience_evidence_count", 0),
         "summary": (
             "Resume appears consistent and well-supported."
             if not flags
