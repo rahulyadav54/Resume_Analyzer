@@ -13,6 +13,19 @@ export async function healthCheck() {
   return data as { status: string };
 }
 
+export async function runDemoScreening(params?: {
+  jobDescription?: string;
+  requiredSkills?: string;
+  jobId?: string;
+}) {
+  const { data } = await api.post("/run-demo", {
+    job_description: params?.jobDescription,
+    required_skills: params?.requiredSkills,
+    job_id: params?.jobId,
+  });
+  return data as ScreeningResponse;
+}
+
 export async function extractSkillsFromJd(job_description: string) {
   const { data } = await api.post("/extract-skills-from-jd", { job_description });
   return data as {

@@ -1,0 +1,3 @@
+* text=auto eol=lf
+backend/requirements.txt text eol=lf
+backend/runtime.txt text eol=lf

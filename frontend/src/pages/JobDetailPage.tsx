@@ -16,7 +16,7 @@ import { UploadZone } from "@/components/jobs/UploadZone";
 import { MatchScore } from "@/components/candidates/MatchScore";
 import { SkillBadge, StatusBadge } from "@/components/candidates/StatusBadge";
 import { useWorkspace } from "@/store/WorkspaceContext";
-import { downloadResultsCsv, screenResumes } from "@/lib/api";
+import { downloadResultsCsv, runDemoScreening, screenResumes } from "@/lib/api";
 import { uid } from "@/lib/utils";
 import type { Candidate } from "@/types";
 
@@ -111,6 +111,26 @@ export function JobDetailPage() {
     },
   });
 
+  const demoMutation = useMutation({
+    mutationFn: () =>
+      runDemoScreening({
+        jobDescription: job!.description,
+        requiredSkills: job!.requiredSkills.join(", "),
+        jobId: job!.id,
+      }),
+    onSuccess: async (data) => {
+      const fileNames = data.results.map((r) => `${r.candidate_name.replace(/\s+/g, "_")}.txt`);
+      await ingestScreeningResults(jobId!, data.results, fileNames);
+      setTab("Candidates");
+    },
+    onError: () =>
+      addToast({
+        title: "Demo screening failed",
+        description: "Start the backend and ensure sample resumes exist in resumes/",
+        type: "error",
+      }),
+  });
+
   if (!job) {
     return (
       <>
@@ -194,11 +214,21 @@ export function JobDetailPage() {
         {showUpload && (
           <Card className="mb-4">
             <CardHeader>
-              <div>
-                <h3 className="text-sm font-semibold">Upload Candidates</h3>
-                <p className="text-xs text-slate-500">
-                  Upload multiple resumes (PDF/DOCX) for AI screening against this job.
-                </p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Upload Candidates</h3>
+                  <p className="text-xs text-slate-500">
+                    Upload resumes (PDF/DOCX) or run live AI screening on bundled sample resumes.
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={demoMutation.isPending}
+                  onClick={() => demoMutation.mutate()}
+                >
+                  Run Demo Screening
+                </Button>
               </div>
             </CardHeader>
             <CardBody>

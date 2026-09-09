@@ -18,6 +18,8 @@ import {
   scheduleInterviewApi,
   updateCandidateStatusApi,
 } from "@/lib/workspaceApi";
+import { SEED_CANDIDATES, SEED_INTERVIEWS, SEED_RESUMES } from "@/data/seedCandidates";
+import { SEED_JOBS } from "@/data/seedJobs";
 
 type WorkspaceState = {
   jobs: Job[];
@@ -29,7 +31,12 @@ type WorkspaceState = {
   authenticated: boolean;
   dbEnabled: boolean;
   dbLoading: boolean;
+  demoMode: boolean;
   setAuthenticated: (v: boolean) => void;
+  enterWorkspace: () => void;
+  startDemoSession: () => void;
+  exitDemoSession: () => Promise<void>;
+  loadDemoSeed: () => void;
   refreshFromDb: () => Promise<void>;
   addJob: (job: Omit<Job, "id" | "createdAt">) => Promise<Job>;
   updateJob: (id: string, patch: Partial<Job>) => void;
@@ -63,12 +70,13 @@ function loadSettings() {
       return {
         aiSettings: parsed.aiSettings ?? defaultAISettings,
         authenticated: parsed.authenticated ?? false,
+        demoMode: parsed.demoMode ?? false,
       };
     }
   } catch {
     /* ignore */
   }
-  return { aiSettings: defaultAISettings, authenticated: false };
+  return { aiSettings: defaultAISettings, authenticated: false, demoMode: false };
 }
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
@@ -79,6 +87,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
   const [aiSettings, setAISettings] = useState<AISettings>(initial.aiSettings);
   const [authenticated, setAuthenticated] = useState(initial.authenticated);
+  const [demoMode, setDemoMode] = useState(initial.demoMode);
   const [dbEnabled, setDbEnabled] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -86,9 +95,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem(
       SETTINGS_KEY,
-      JSON.stringify({ aiSettings, authenticated })
+      JSON.stringify({ aiSettings, authenticated, demoMode })
     );
-  }, [aiSettings, authenticated]);
+  }, [aiSettings, authenticated, demoMode]);
 
   const addToast = useCallback((toast: Omit<ToastMessage, "id">) => {
     const id = uid("toast");
@@ -121,21 +130,70 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [addToast]);
 
+  const loadDemoSeed = useCallback(() => {
+    setJobs(SEED_JOBS);
+    setCandidates(SEED_CANDIDATES);
+    setInterviews(SEED_INTERVIEWS);
+    setResumes(SEED_RESUMES);
+    addToast({
+      title: "Demo data loaded",
+      description: "Sample jobs, candidates, and interviews are ready.",
+      type: "info",
+    });
+  }, [addToast]);
+
+  const enterWorkspace = useCallback(() => {
+    setDemoMode(false);
+    setAuthenticated(true);
+  }, []);
+
+  const startDemoSession = useCallback(() => {
+    setDemoMode(true);
+    setAuthenticated(true);
+    loadDemoSeed();
+  }, [loadDemoSeed]);
+
+  const exitDemoSession = useCallback(async () => {
+    setDemoMode(false);
+    setJobs([]);
+    setCandidates([]);
+    setInterviews([]);
+    setResumes([]);
+    await refreshFromDb();
+    addToast({
+      title: "Exited demo session",
+      description: "Showing your live workspace data.",
+      type: "info",
+    });
+  }, [addToast, refreshFromDb]);
+
   useEffect(() => {
-    if (authenticated) {
-      refreshFromDb();
-    } else {
+    if (!authenticated) {
       setJobs([]);
       setCandidates([]);
       setInterviews([]);
       setResumes([]);
       setDbEnabled(false);
+      return;
     }
-  }, [authenticated, refreshFromDb]);
+
+    if (demoMode) {
+      setJobs(SEED_JOBS);
+      setCandidates(SEED_CANDIDATES);
+      setInterviews(SEED_INTERVIEWS);
+      setResumes(SEED_RESUMES);
+      fetchWorkspace()
+        .then((data) => setDbEnabled(data.dbEnabled))
+        .catch(() => setDbEnabled(false));
+      return;
+    }
+
+    refreshFromDb();
+  }, [authenticated, demoMode, refreshFromDb]);
 
   const addJob = useCallback(
     async (job: Omit<Job, "id" | "createdAt">) => {
-      if (dbEnabled) {
+      if (dbEnabled && !demoMode) {
         const created = await createJobApi(job);
         setJobs((j) => [created, ...j]);
         addToast({ title: "Job created successfully", type: "success" });
@@ -151,7 +209,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       });
       return created;
     },
-    [addToast, dbEnabled]
+    [addToast, dbEnabled, demoMode]
   );
 
   const updateJob = useCallback((id: string, patch: Partial<Job>) => {
@@ -160,7 +218,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const ingestScreeningResults = useCallback(
     async (jobId: string, results: ScreeningResult[], fileNames?: string[]) => {
-      if (dbEnabled) {
+      if (dbEnabled && !demoMode) {
         const saved = await saveScreeningResultsApi(jobId, results, fileNames);
         await refreshFromDb();
         addToast({
@@ -216,12 +274,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       });
       return mapped;
     },
-    [addToast, dbEnabled, refreshFromDb]
+    [addToast, dbEnabled, demoMode, refreshFromDb]
   );
 
   const updateCandidateStatus = useCallback(
     async (id: string, status: CandidateStatus) => {
-      if (dbEnabled) {
+      if (dbEnabled && !demoMode) {
         await updateCandidateStatusApi(id, status);
         await refreshFromDb();
       } else {
@@ -236,12 +294,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       };
       if (labels[status]) addToast({ title: labels[status]!, type: "success" });
     },
-    [addToast, dbEnabled, refreshFromDb]
+    [addToast, dbEnabled, demoMode, refreshFromDb]
   );
 
   const scheduleInterview = useCallback(
     async (candidateId: string, jobId: string) => {
-      if (dbEnabled) {
+      if (dbEnabled && !demoMode) {
         await scheduleInterviewApi(candidateId, jobId);
         await refreshFromDb();
         addToast({ title: "Moved to interview", type: "success" });
@@ -262,7 +320,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       ]);
       await updateCandidateStatus(candidateId, "interview");
     },
-    [addToast, dbEnabled, refreshFromDb, updateCandidateStatus]
+    [addToast, dbEnabled, demoMode, refreshFromDb, updateCandidateStatus]
   );
 
   const updateAISettings = useCallback((patch: Partial<AISettings>) => {
@@ -287,7 +345,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     authenticated,
     dbEnabled,
     dbLoading,
+    demoMode,
     setAuthenticated,
+    enterWorkspace,
+    startDemoSession,
+    exitDemoSession,
+    loadDemoSeed,
     refreshFromDb,
     addJob,
     updateJob,

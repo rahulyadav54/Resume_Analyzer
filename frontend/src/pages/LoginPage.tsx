@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { useWorkspace } from "@/store/WorkspaceContext";
 
 export function LoginPage() {
-  const { setAuthenticated, authenticated } = useWorkspace();
+  const { enterWorkspace, startDemoSession, authenticated } = useWorkspace();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,14 +35,24 @@ export function LoginPage() {
         <Button
           className="w-full"
           onClick={() => {
-            setAuthenticated(true);
+            enterWorkspace();
             navigate("/dashboard");
           }}
         >
           Enter workspace
         </Button>
+        <Button
+          variant="secondary"
+          className="mt-2 w-full"
+          onClick={() => {
+            startDemoSession();
+            navigate("/dashboard");
+          }}
+        >
+          Start demo session
+        </Button>
         <p className="mt-3 text-center text-xs text-slate-400">
-          Demo access — no password verification in this build.
+          Demo session loads sample jobs and candidates. Live workspace uses your database.
         </p>
       </div>
     </div>

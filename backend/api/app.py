@@ -1,14 +1,18 @@
 import os
 import shutil
+from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from src.text_extractor import extract_resume_text
 from src.skill_matcher import extract_skills_from_jd
-from src.screening_service import screen_resume_files, UPLOAD_FOLDER
+from src.screening_service import screen_resume_files, run_demo_screening, UPLOAD_FOLDER
 from src.db.repository import is_db_enabled, save_screening_results, db_health
 from api.workspace import router as workspace_router
 
@@ -41,12 +45,19 @@ class JobDescriptionRequest(BaseModel):
     job_description: str
 
 
+class DemoScreeningRequest(BaseModel):
+    job_description: Optional[str] = None
+    required_skills: Optional[str] = None
+    job_id: Optional[str] = None
+
+
 @app.get("/")
 def home():
     return {
         "message": "Automated Resume Screening API is running",
         "endpoints": {
             "screen_resumes": "POST /screen-resumes",
+            "run_demo": "POST /run-demo",
             "extract_skills": "POST /extract-skills-from-jd",
             "workspace": "GET /workspace",
         },
@@ -56,6 +67,37 @@ def home():
 @app.get("/health")
 def health():
     return {"status": "ok", "database": db_health()}
+
+
+@app.post("/run-demo")
+def run_demo(payload: DemoScreeningRequest = DemoScreeningRequest()):
+    try:
+        skills_list = [
+            skill.strip().lower()
+            for skill in (payload.required_skills or "").split(",")
+            if skill.strip()
+        ]
+        response = run_demo_screening(
+            job_description=payload.job_description,
+            required_skills=skills_list or None,
+        )
+
+        if payload.job_id and is_db_enabled():
+            file_names = [
+                os.path.basename(path)
+                for path in sorted(
+                    (UPLOAD_FOLDER.parent.parent / "resumes").glob("*")
+                )
+                if path.suffix.lower() in {".pdf", ".docx", ".txt"}
+            ]
+            save_screening_results(payload.job_id, response["results"], file_names)
+            response["saved_to_database"] = True
+
+        return response
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Demo screening failed: {exc}")
 
 
 @app.post("/extract-skills-from-jd")

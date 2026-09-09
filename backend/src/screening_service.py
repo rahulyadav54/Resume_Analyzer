@@ -93,3 +93,23 @@ def screen_resume_files(
         "job_description_used": jd_text,
         "results": ranked,
     }
+
+
+def run_demo_screening(
+    job_description: str | None = None,
+    required_skills: list[str] | None = None,
+) -> dict:
+    resume_files = sorted(
+        str(path)
+        for path in RESUME_FOLDER.glob("*")
+        if path.suffix.lower() in {".pdf", ".docx", ".txt"}
+    )
+
+    if not resume_files:
+        raise FileNotFoundError("No sample resumes found in the resumes/ folder.")
+
+    return screen_resume_files(
+        file_paths=resume_files,
+        job_description=job_description or DEFAULT_JOB_DESCRIPTION,
+        required_skills=required_skills or DEFAULT_REQUIRED_SKILLS,
+    )

@@ -9,23 +9,21 @@ export function HelpPage() {
         <Card>
           <CardBody className="space-y-3 text-sm text-slate-700">
             <p>
-              <strong>1.</strong> Configure Supabase on the backend (
+              <strong>Quick start:</strong> On the login page, click <strong>Start demo session</strong>{" "}
+              to explore sample jobs, candidates, and interviews instantly.
+            </p>
+            <p>
+              <strong>Live screening:</strong> Open any job → upload resumes or click{" "}
+              <strong>Run Demo Screening</strong> to rank bundled sample resumes with AI.
+            </p>
+            <p>
+              <strong>Production setup:</strong> Configure Supabase on the backend (
               <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_KEY</code>) and run{" "}
               <code>supabase/schema.sql</code>.
             </p>
             <p>
-              <strong>2.</strong> Start the FastAPI backend and Vite frontend.
-            </p>
-            <p>
-              <strong>3.</strong> Create a job with title, description, and required skills.
-            </p>
-            <p>
-              <strong>4.</strong> Open the job → upload real resumes (PDF/DOCX) → view ranked
-              candidates with AI explanations.
-            </p>
-            <p>
-              <strong>5.</strong> Shortlist candidates, schedule interviews, and export CSV
-              reports.
+              <strong>Real workflow:</strong> Click <strong>Enter workspace</strong> → create a job →
+              upload PDF/DOCX resumes → shortlist candidates → schedule interviews → export CSV.
             </p>
           </CardBody>
         </Card>
