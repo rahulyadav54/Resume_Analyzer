@@ -1,0 +1,21 @@
+Aditi Sharma
+Email: aditi@example.com | Phone: +91-9876543210
+
+Education:
+B.Tech Computer Engineering, Pune University (2022-2026)
+
+Certifications:
+IBM Certified Data Science Professional
+Coursera Machine Learning Specialization
+
+Skills:
+Python, SQL, FastAPI, Machine Learning, Pandas, NumPy, Scikit-learn, Git, REST API, Data Analysis, Docker
+
+Projects:
+Customer Churn Prediction System using Scikit-learn and Pandas
+Automated Resume Screening Tool with FastAPI and NLP
+Student Performance Prediction System with REST API backend
+
+Experience:
+Python Developer Intern at TechNova Solutions for 6 months.
+Built REST APIs and data pipelines for internal analytics platform.

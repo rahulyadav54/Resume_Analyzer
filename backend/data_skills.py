@@ -1,0 +1,18 @@
+SKILLS = [
+    "python", "java", "c", "c++", "c#", "go", "rust", "kotlin", "swift",
+    "sql", "mysql", "postgresql", "mongodb", "redis", "sqlite",
+    "pandas", "numpy", "matplotlib", "seaborn", "scikit-learn", "tensorflow",
+    "pytorch", "keras", "opencv",
+    "machine learning", "deep learning", "nlp", "computer vision",
+    "data analysis", "data science", "data engineering", "etl",
+    "excel", "power bi", "tableau", "looker",
+    "fastapi", "flask", "django", "rest api", "graphql",
+    "html", "css", "javascript", "typescript", "react", "next.js", "vue.js",
+    "angular", "tailwind", "bootstrap",
+    "node.js", "express.js", "spring boot",
+    "git", "github", "gitlab", "docker", "kubernetes", "linux", "jenkins", "ci/cd",
+    "aws", "azure", "gcp", "firebase",
+    "agile", "scrum", "jira",
+    "communication", "teamwork", "problem solving", "leadership",
+    "statistics", "probability", "linear algebra",
+]

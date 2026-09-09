@@ -1,0 +1,16 @@
+Rahul Patil
+Email: rahul@example.com | Phone: +91-9988776655
+
+Education:
+B.Tech Information Technology, Nagpur University (2022-2026)
+
+Skills:
+HTML, CSS, JavaScript, TypeScript, React, Next.js, Git, Tailwind, Communication
+
+Projects:
+Portfolio Website with React and Tailwind CSS
+E-commerce Frontend Dashboard using Next.js
+
+Experience:
+Frontend Developer Intern at WebCraft Studio for 3 months.
+Developed responsive UI components and integrated REST APIs.
