@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { isUsingSupabaseAuth } from "@/lib/auth";
 import { useWorkspace } from "@/store/WorkspaceContext";
 
 const features = [
@@ -34,18 +35,47 @@ const features = [
 ];
 
 export function LoginPage() {
-  const { enterWorkspace, startDemoSession, authenticated } = useWorkspace();
+  const { login, startDemoSession, authenticated, authLoading } = useWorkspace();
   const navigate = useNavigate();
+  const [email, setEmail] = useState("ramiyaa@company.com");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (authenticated) navigate("/dashboard", { replace: true });
-  }, [authenticated, navigate]);
+    if (!authLoading && authenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [authenticated, authLoading, navigate]);
 
-  const handleEnterWorkspace = () => {
-    enterWorkspace();
-    navigate("/dashboard");
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+
+    if (!email.trim()) {
+      setError("Please enter your work email.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await login(email.trim(), password, rememberMe);
+      navigate("/dashboard", { replace: true });
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : null;
+      setError(message || "Login failed. Check your credentials and ensure the backend is running.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDemoSession = () => {
@@ -55,7 +85,6 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Brand panel */}
       <div className="relative hidden w-[45%] overflow-hidden bg-slate-950 lg:flex lg:flex-col lg:justify-between">
         <div className="absolute inset-0 bg-gradient-to-br from-brand-700 via-slate-900 to-slate-950" />
         <div
@@ -81,18 +110,18 @@ export function LoginPage() {
             </div>
             <div>
               <p className="text-lg font-semibold tracking-tight text-white">AI Recruit</p>
-              <p className="text-sm text-indigo-200/80">Intelligent Candidate Screening</p>
+              <p className="text-sm text-indigo-200/80">Recruiter Portal</p>
             </div>
           </div>
 
           <div className="mt-16 max-w-md">
             <h2 className="text-3xl font-semibold leading-tight tracking-tight text-white xl:text-4xl">
-              Hire smarter with
-              <span className="block text-indigo-300">AI-driven recruitment</span>
+              Secure recruiter access for
+              <span className="block text-indigo-300">AI-driven hiring</span>
             </h2>
             <p className="mt-4 text-base leading-relaxed text-slate-300">
-              Screen hundreds of resumes in minutes. Rank, compare, and shortlist candidates
-              with transparent, explainable AI scoring.
+              Sign in with your recruiter credentials to manage jobs, screen resumes, and
+              schedule interviews in your live workspace.
             </p>
           </div>
 
@@ -113,12 +142,13 @@ export function LoginPage() {
 
         <div className="relative z-10 border-t border-white/10 px-10 py-6 xl:px-14">
           <p className="text-xs text-slate-500">
-            Trusted by recruiters for faster, fairer, data-driven hiring decisions.
+            {isUsingSupabaseAuth()
+              ? "Sign in with your Supabase recruiter account."
+              : "Local fallback: ramiyaa@company.com / Recruit@2024"}
           </p>
         </div>
       </div>
 
-      {/* Login panel */}
       <div className="flex flex-1 flex-col items-center justify-center bg-canvas px-5 py-10 sm:px-8">
         <div className="mb-8 flex items-center gap-3 lg:hidden">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 shadow-md shadow-brand-600/25">
@@ -126,27 +156,31 @@ export function LoginPage() {
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">AI Recruit</p>
-            <p className="text-sm text-slate-500">Intelligent Candidate Screening</p>
+            <p className="text-sm text-slate-500">Recruiter Portal</p>
           </div>
         </div>
 
         <div className="w-full max-w-[420px]">
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Welcome back
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
             <p className="mt-2 text-sm text-slate-500">
-              Sign in to your recruitment workspace to continue.
+              Enter your recruiter credentials to access the workspace.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-border/80 bg-white p-7 shadow-[0_8px_30px_rgba(15,23,42,0.06)] sm:p-8">
+          <form
+            onSubmit={handleLogin}
+            className="rounded-2xl border border-border/80 bg-white p-7 shadow-[0_8px_30px_rgba(15,23,42,0.06)] sm:p-8"
+          >
             <div className="space-y-5">
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
               <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-xs font-medium text-slate-700"
-                >
+                <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-slate-700">
                   Work email
                 </label>
                 <div className="relative">
@@ -158,17 +192,17 @@ export function LoginPage() {
                     id="email"
                     type="email"
                     autoComplete="email"
-                    defaultValue="ramiyaa@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ramiyaa@company.com"
                     className="h-11 pl-10"
+                    required
                   />
                 </div>
               </div>
 
               <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-xs font-medium text-slate-700"
-                >
+                <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-slate-700">
                   Password
                 </label>
                 <div className="relative">
@@ -180,8 +214,11 @@ export function LoginPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
-                    defaultValue="password123"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
                     className="h-11 pl-10 pr-10"
+                    required
                   />
                   <button
                     type="button"
@@ -208,20 +245,16 @@ export function LoginPage() {
                   />
                   <span className="text-xs text-slate-600">Remember me</span>
                 </label>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-brand-600 transition hover:text-brand-700"
-                >
-                  Forgot password?
-                </button>
+                <span className="text-xs text-slate-400">Session secured</span>
               </div>
 
               <Button
+                type="submit"
                 size="lg"
+                disabled={submitting}
                 className="h-11 w-full text-sm font-semibold shadow-md shadow-brand-600/20"
-                onClick={handleEnterWorkspace}
               >
-                Enter workspace
+                {submitting ? "Signing in…" : "Sign in to workspace"}
               </Button>
             </div>
 
@@ -237,26 +270,20 @@ export function LoginPage() {
             </div>
 
             <Button
+              type="button"
               variant="secondary"
               size="lg"
               className="h-11 w-full border-slate-200 bg-slate-50 text-sm font-medium hover:bg-slate-100"
               onClick={handleDemoSession}
             >
               <Play className="h-4 w-4 text-brand-600" strokeWidth={2} />
-              Start demo session
+              Explore demo (no login)
             </Button>
 
             <p className="mt-5 text-center text-xs leading-relaxed text-slate-400">
-              Demo loads sample jobs and candidates instantly.
-              <span className="block mt-0.5">Live workspace connects to your database.</span>
+              Demo mode uses sample data only. Sign in for your live recruitment database.
             </p>
-          </div>
-
-          <p className="mt-8 text-center text-xs text-slate-400">
-            By continuing, you agree to our{" "}
-            <span className="text-slate-500">Terms of Service</span> and{" "}
-            <span className="text-slate-500">Privacy Policy</span>.
-          </p>
+          </form>
         </div>
       </div>
     </div>

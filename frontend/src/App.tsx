@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WorkspaceProvider } from "@/store/WorkspaceContext";
+import { WorkspaceProvider, useWorkspace } from "@/store/WorkspaceContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -23,6 +23,14 @@ const queryClient = new QueryClient({
     queries: { retry: 1, refetchOnWindowFocus: false },
   },
 });
+
+function RootRedirect() {
+  const { authenticated, authLoading } = useWorkspace();
+  if (authLoading) {
+    return <Navigate to="/login" replace />;
+  }
+  return <Navigate to={authenticated ? "/dashboard" : "/login"} replace />;
+}
 
 export default function App() {
   return (
@@ -51,8 +59,8 @@ export default function App() {
               <Route path="/settings/ai" element={<AISettingsPage />} />
               <Route path="/settings" element={<Navigate to="/settings/ai" replace />} />
               <Route path="/help" element={<HelpPage />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<RootRedirect />} />
+              <Route path="*" element={<RootRedirect />} />
             </Route>
           </Routes>
         </BrowserRouter>

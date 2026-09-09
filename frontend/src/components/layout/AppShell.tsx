@@ -6,15 +6,26 @@ import { cn } from "@/lib/utils";
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { authenticated, toasts, dismissToast } = useWorkspace();
+  const { authenticated, authLoading, toasts, dismissToast } = useWorkspace();
   const location = useLocation();
 
-  if (!authenticated && location.pathname !== "/login") {
-    return <Navigate to="/login" replace />;
+  if (location.pathname === "/login") {
+    if (!authLoading && authenticated) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Outlet />;
   }
 
-  if (location.pathname === "/login") {
-    return <Outlet />;
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <p className="text-sm text-slate-500">Loading recruiter portal…</p>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   return (

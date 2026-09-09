@@ -3,6 +3,17 @@
 
 create extension if not exists "pgcrypto";
 
+-- Recruiter profiles linked to Supabase Auth users (auth.users)
+create table if not exists recruiter_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  name text not null,
+  role text not null default 'Senior Recruiter',
+  department text not null default 'Talent Acquisition',
+  initials text not null default 'R',
+  created_at timestamptz not null default now()
+);
+
 create table if not exists jobs (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -76,7 +87,16 @@ create index if not exists idx_candidates_final_score on candidates(final_score 
 create index if not exists idx_interviews_job_id on interviews(job_id);
 create index if not exists idx_resumes_job_id on resumes(job_id);
 
--- Optional: enable RLS later when adding Supabase Auth
+alter table recruiter_profiles enable row level security;
+
+create policy "recruiters_read_own_profile"
+  on recruiter_profiles for select
+  using (auth.uid() = id);
+
+create policy "service_role_all_recruiter_profiles"
+  on recruiter_profiles for all
+  using (true) with check (true);
+
 alter table jobs enable row level security;
 alter table candidates enable row level security;
 alter table interviews enable row level security;

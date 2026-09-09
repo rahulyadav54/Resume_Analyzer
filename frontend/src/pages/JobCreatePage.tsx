@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { useWorkspace } from "@/store/WorkspaceContext";
-import { extractSkillsFromJd } from "@/lib/api";
+import { analyzeJobDescription, extractSkillsFromJd } from "@/lib/api";
+import type { JdQuality } from "@/types";
 import { DEFAULT_WEIGHTS, weightsTotal } from "@/lib/scoring";
 import type { ScoringWeights } from "@/types";
 import { Wand2 } from "lucide-react";
@@ -29,9 +30,16 @@ export function JobCreatePage() {
     ...aiSettings.defaultWeights,
   });
 
+  const [jdQuality, setJdQuality] = useState<JdQuality | null>(null);
+
   const extractMutation = useMutation({
     mutationFn: () => extractSkillsFromJd(description),
     onSuccess: (data) => setRequiredSkills(data.required_skills),
+  });
+
+  const analyzeMutation = useMutation({
+    mutationFn: () => analyzeJobDescription(description, requiredSkills),
+    onSuccess: (data) => setJdQuality(data),
   });
 
   const total = weightsTotal(weights);
@@ -106,13 +114,40 @@ export function JobCreatePage() {
             <CardHeader>
               <h3 className="text-sm font-semibold">Job Description</h3>
             </CardHeader>
-            <CardBody>
+            <CardBody className="space-y-3">
               <Textarea
                 rows={6}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the role, responsibilities, and requirements…"
               />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={!description.trim() || analyzeMutation.isPending}
+                onClick={() => analyzeMutation.mutate()}
+              >
+                {analyzeMutation.isPending ? "Analyzing…" : "Analyze JD quality"}
+              </Button>
+              {jdQuality && (
+                <div className="rounded-lg border border-border bg-slate-50 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-900">
+                      JD Quality: {jdQuality.jd_quality_score}%
+                    </span>
+                    <span className="text-xs uppercase text-slate-500">{jdQuality.clarity_rating}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">{jdQuality.summary}</p>
+                  {jdQuality.suggestions.length > 0 && (
+                    <ul className="mt-2 list-disc pl-4 text-xs text-slate-600">
+                      {jdQuality.suggestions.map((s) => (
+                        <li key={s}>{s}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </CardBody>
           </Card>
 

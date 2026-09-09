@@ -5,10 +5,18 @@ import type {
   CandidateStatus,
   Interview,
   Job,
+  RecruiterUser,
   ResumeRecord,
   ScreeningResult,
   ToastMessage,
 } from "@/types";
+import {
+  fetchCurrentRecruiter,
+  loginRecruiter,
+  logoutRecruiter,
+  restoreRecruiterSession,
+} from "@/lib/auth";
+import { getSupabase } from "@/lib/supabase";
 import { DEFAULT_WEIGHTS } from "@/lib/scoring";
 import { uid } from "@/lib/utils";
 import { getApiDisplayUrl, isUsingLocalApi } from "@/lib/api";
@@ -32,12 +40,14 @@ type WorkspaceState = {
   resumes: ResumeRecord[];
   aiSettings: AISettings;
   toasts: ToastMessage[];
+  recruiter: RecruiterUser | null;
   authenticated: boolean;
+  authLoading: boolean;
   dbEnabled: boolean;
   dbLoading: boolean;
   demoMode: boolean;
-  setAuthenticated: (v: boolean) => void;
-  enterWorkspace: () => void;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
+  logout: () => Promise<void>;
   startDemoSession: () => void;
   exitDemoSession: () => Promise<void>;
   loadDemoSeed: () => void;
@@ -67,6 +77,7 @@ const defaultAISettings: AISettings = {
   goodMatchMin: 75,
   considerMin: 60,
   semanticMatching: true,
+  biasBlindMode: false,
   explanationStyle: "detailed",
   defaultWeights: { ...DEFAULT_WEIGHTS },
 };
@@ -79,15 +90,14 @@ function loadSettings() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        aiSettings: parsed.aiSettings ?? defaultAISettings,
-        authenticated: parsed.authenticated ?? false,
+        aiSettings: { ...defaultAISettings, ...(parsed.aiSettings ?? {}) },
         demoMode: parsed.demoMode ?? false,
       };
     }
   } catch {
     /* ignore */
   }
-  return { aiSettings: defaultAISettings, authenticated: false, demoMode: false };
+  return { aiSettings: defaultAISettings, demoMode: false };
 }
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
@@ -97,7 +107,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
   const [aiSettings, setAISettings] = useState<AISettings>(initial.aiSettings);
-  const [authenticated, setAuthenticated] = useState(initial.authenticated);
+  const [recruiter, setRecruiter] = useState<RecruiterUser | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(initial.demoMode);
   const [dbEnabled, setDbEnabled] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
@@ -106,9 +118,75 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem(
       SETTINGS_KEY,
-      JSON.stringify({ aiSettings, authenticated, demoMode })
+      JSON.stringify({ aiSettings, demoMode })
     );
-  }, [aiSettings, authenticated, demoMode]);
+  }, [aiSettings, demoMode]);
+
+  useEffect(() => {
+    let active = true;
+
+    const restoreSession = async () => {
+      try {
+        const user = await restoreRecruiterSession();
+        if (!active) return;
+
+        if (user) {
+          setRecruiter(user);
+          setAuthenticated(true);
+          setDemoMode(false);
+        } else {
+          setRecruiter(null);
+          setAuthenticated(false);
+        }
+      } catch {
+        if (active) {
+          setRecruiter(null);
+          setAuthenticated(false);
+        }
+      } finally {
+        if (active) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT") {
+        setRecruiter(null);
+        setAuthenticated(false);
+        setDemoMode(false);
+        return;
+      }
+
+      if (
+        session?.access_token &&
+        (event === "SIGNED_IN" ||
+          event === "TOKEN_REFRESHED" ||
+          event === "INITIAL_SESSION")
+      ) {
+        const user = await fetchCurrentRecruiter();
+        if (user) {
+          setRecruiter(user);
+          setAuthenticated(true);
+          setDemoMode(false);
+        }
+      }
+    });
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   const addToast = useCallback((toast: Omit<ToastMessage, "id">) => {
     const id = uid("toast");
@@ -169,14 +247,49 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     });
   }, [addToast]);
 
-  const enterWorkspace = useCallback(() => {
+  const login = useCallback(
+    async (email: string, password: string, remember = true) => {
+      const session = await loginRecruiter(email, password, remember);
+      setRecruiter(session.user);
+      setAuthenticated(true);
+      setDemoMode(false);
+      addToast({
+        title: `Welcome back, ${session.user.name}`,
+        description: "Your recruitment workspace is ready.",
+        type: "success",
+      });
+    },
+    [addToast]
+  );
+
+  const logout = useCallback(async () => {
+    await logoutRecruiter();
+    setRecruiter(null);
+    setAuthenticated(false);
     setDemoMode(false);
-    setAuthenticated(true);
-  }, []);
+    setJobs([]);
+    setCandidates([]);
+    setInterviews([]);
+    setResumes([]);
+    setDbEnabled(false);
+    addToast({
+      title: "Signed out",
+      description: "You have been logged out of the recruiter portal.",
+      type: "info",
+    });
+  }, [addToast]);
 
   const startDemoSession = useCallback(() => {
     setDemoMode(true);
     setAuthenticated(true);
+    setRecruiter({
+      id: "demo",
+      email: "demo@airecruit.app",
+      name: "Demo Recruiter",
+      role: "Senior Recruiter",
+      initials: "DR",
+      department: "Talent Acquisition",
+    });
     loadDemoSeed();
   }, [loadDemoSeed]);
 
@@ -400,7 +513,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const scheduleInterview = useCallback(
     async (candidateId: string, jobId: string) => {
       if (dbEnabled && !demoMode) {
-        await scheduleInterviewApi(candidateId, jobId);
+        await scheduleInterviewApi(candidateId, jobId, "Technical", recruiter?.name ?? "Recruiter");
         await refreshFromDb();
         addToast({ title: "Moved to interview", type: "success" });
         return;
@@ -413,14 +526,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           jobId,
           date: new Date(Date.now() + 3 * 86400000).toISOString(),
           type: "Technical",
-          interviewer: "Ramiyaa",
+          interviewer: recruiter?.name ?? "Recruiter",
           status: "scheduled",
         },
         ...prev,
       ]);
       await updateCandidateStatus(candidateId, "interview");
     },
-    [addToast, dbEnabled, demoMode, refreshFromDb, updateCandidateStatus]
+    [addToast, dbEnabled, demoMode, recruiter?.name, refreshFromDb, updateCandidateStatus]
   );
 
   const updateAISettings = useCallback((patch: Partial<AISettings>) => {
@@ -442,12 +555,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     resumes,
     aiSettings,
     toasts,
+    recruiter,
     authenticated,
+    authLoading,
     dbEnabled,
     dbLoading,
     demoMode,
-    setAuthenticated,
-    enterWorkspace,
+    login,
+    logout,
     startDemoSession,
     exitDemoSession,
     loadDemoSeed,

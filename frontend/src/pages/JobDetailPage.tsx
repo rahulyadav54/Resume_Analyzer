@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -18,6 +18,7 @@ import { MatchScore } from "@/components/candidates/MatchScore";
 import { SkillBadge, StatusBadge } from "@/components/candidates/StatusBadge";
 import { useWorkspace } from "@/store/WorkspaceContext";
 import {
+  analyzeJobDescription,
   downloadResultsCsv,
   runDemoScreening,
   screenResumesInBatches,
@@ -26,7 +27,7 @@ import {
 import { downloadCandidateReport } from "@/lib/candidateReport";
 import { MAX_RESUMES_PER_JOB, RESUME_BATCH_SIZE } from "@/lib/screeningLimits";
 import { uid } from "@/lib/utils";
-import type { Candidate, Job } from "@/types";
+import type { Candidate, JdQuality, Job } from "@/types";
 
 const tabs = [
   "Overview",
@@ -53,6 +54,7 @@ export function JobDetailPage() {
     demoMode,
     refreshFromDb,
     deleteCandidates,
+    aiSettings,
   } = useWorkspace();
   const job = jobs.find((j) => j.id === jobId);
   const [tab, setTab] = useState<Tab>("Candidates");
@@ -64,6 +66,15 @@ export function JobDetailPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+  const [jdQuality, setJdQuality] = useState<JdQuality | null>(null);
+  const [screeningAlerts, setScreeningAlerts] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!job?.description) return;
+    analyzeJobDescription(job.description, job.requiredSkills.join(", "))
+      .then(setJdQuality)
+      .catch(() => setJdQuality(null));
+  }, [job?.id, job?.description, job?.requiredSkills]);
 
   const existingCandidateCount = useMemo(
     () => candidates.filter((c) => c.jobId === jobId).length,
@@ -160,12 +171,15 @@ export function JobDetailPage() {
           files,
           jobId: dbEnabled && !demoMode ? jobId! : undefined,
           append: appendToJob,
+          biasBlindMode: aiSettings.biasBlindMode,
         },
         setBatchProgress
       );
       return { data, files, appendToJob };
     },
     onSuccess: async ({ data, files, appendToJob }) => {
+      if (data.jd_quality) setJdQuality(data.jd_quality);
+      setScreeningAlerts((data.duplicate_alerts ?? []).map((a) => a.message));
       if (!dbEnabled || demoMode) {
         await ingestScreeningResults(
           jobId!,
@@ -204,8 +218,11 @@ export function JobDetailPage() {
         jobDescription: job!.description,
         requiredSkills: job!.requiredSkills.join(", "),
         jobId: job!.id,
+        biasBlindMode: aiSettings.biasBlindMode,
       }),
     onSuccess: async (data) => {
+      if (data.jd_quality) setJdQuality(data.jd_quality);
+      setScreeningAlerts((data.duplicate_alerts ?? []).map((a) => a.message));
       const fileNames = data.results.map((r) => `${r.candidate_name.replace(/\s+/g, "_")}.txt`);
       await ingestScreeningResults(jobId!, data.results, fileNames);
       setTab("Candidates");
@@ -321,6 +338,23 @@ export function JobDetailPage() {
             </button>
           ))}
         </div>
+
+        {screeningAlerts.length > 0 && (
+          <div className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-medium">Duplicate applications detected</p>
+            <ul className="mt-1 list-disc pl-5 text-xs">
+              {screeningAlerts.map((alert) => (
+                <li key={alert}>{alert}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {aiSettings.biasBlindMode && (
+          <div className="mb-4 rounded-[10px] border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-800">
+            Bias-blind screening is <strong>ON</strong> — candidates are scored on skills only, without identity cues.
+          </div>
+        )}
 
         {showUpload && (
           <Card className="mb-4">
@@ -438,18 +472,43 @@ export function JobDetailPage() {
                 </div>
               </CardBody>
             </Card>
-            <Card>
-              <CardHeader>
-                <h3 className="text-sm font-semibold">Pipeline</h3>
-              </CardHeader>
-              <CardBody className="space-y-2 text-sm">
-                <Row label="Applicants" value={jobCandidates.length} />
-                <Row label="Shortlisted" value={shortlisted.length} />
-                <Row label="Interviews" value={jobInterviews.length} />
-                <Row label="Location" value={job.location} />
-                <Row label="Experience" value={job.experience} />
-              </CardBody>
-            </Card>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <h3 className="text-sm font-semibold">Pipeline</h3>
+                </CardHeader>
+                <CardBody className="space-y-2 text-sm">
+                  <Row label="Applicants" value={jobCandidates.length} />
+                  <Row label="Shortlisted" value={shortlisted.length} />
+                  <Row label="Interviews" value={jobInterviews.length} />
+                  <Row label="Location" value={job.location} />
+                  <Row label="Experience" value={job.experience} />
+                </CardBody>
+              </Card>
+              {jdQuality && (
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-sm font-semibold">JD Quality Score</h3>
+                  </CardHeader>
+                  <CardBody className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-semibold text-slate-900">{jdQuality.jd_quality_score}%</span>
+                      <Badge tone={jdQuality.jd_quality_score >= 75 ? "success" : "warning"}>
+                        {jdQuality.clarity_rating}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-500">{jdQuality.summary}</p>
+                    {jdQuality.suggestions.length > 0 && (
+                      <ul className="list-disc space-y-1 pl-4 text-xs text-slate-600">
+                        {jdQuality.suggestions.map((s) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardBody>
+                </Card>
+              )}
+            </div>
           </div>
         )}
 
@@ -728,6 +787,14 @@ function CandidatesTab({
                     >
                       {c.candidate_name}
                     </Link>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {c.integrity_check?.risk_level === "high" && (
+                        <Badge tone="warning">Integrity risk</Badge>
+                      )}
+                      {c.duplicate_warning?.is_duplicate && (
+                        <Badge tone="warning">Duplicate</Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3">
                     <MatchScore score={c.final_score} size="sm" />

@@ -24,6 +24,7 @@ export function CandidateDetailPage() {
     deleteCandidates,
     scheduleInterview,
     addToast,
+    recruiter,
   } = useWorkspace();
   const candidate = candidates.find((c) => c.id === candidateId);
   const job = jobs.find((j) => j.id === jobId || j.id === candidate?.jobId);
@@ -81,8 +82,8 @@ ${
 }
 
 Best regards,
-Ramiyaa
-Talent Acquisition`;
+${recruiter?.name ?? "Recruiter"}
+${recruiter?.department ?? "Talent Acquisition"}`;
     setEmailDraft(body);
     setEmailOpen(true);
   };
@@ -260,6 +261,95 @@ Talent Acquisition`;
                 )}
               </CardBody>
             </Card>
+
+            {candidate.integrity_check && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Resume Integrity Check</h3>
+                    <Badge
+                      tone={
+                        candidate.integrity_check.risk_level === "high"
+                          ? "warning"
+                          : candidate.integrity_check.risk_level === "medium"
+                            ? "brand"
+                            : "success"
+                      }
+                    >
+                      {candidate.integrity_check.integrity_score}% · {candidate.integrity_check.risk_level} risk
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardBody className="space-y-2">
+                  <p className="text-sm text-slate-700">{candidate.integrity_check.summary}</p>
+                  {candidate.integrity_check.flags.map((flag) => (
+                    <div
+                      key={flag.message}
+                      className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2 text-sm text-amber-900"
+                    >
+                      <p className="font-medium">{flag.message}</p>
+                      {flag.details.length > 0 && (
+                        <p className="mt-1 text-xs">{flag.details.join(", ")}</p>
+                      )}
+                    </div>
+                  ))}
+                </CardBody>
+              </Card>
+            )}
+
+            {candidate.bias_blind_analysis && (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-sm font-semibold">Bias-Blind Screening</h3>
+                </CardHeader>
+                <CardBody className="space-y-2 text-sm text-slate-700">
+                  <p>{candidate.bias_blind_analysis.summary}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg bg-slate-50 px-3 py-2">
+                      <p className="text-xs text-slate-500">Standard score</p>
+                      <p className="font-semibold">{candidate.bias_blind_analysis.standard_score}%</p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2">
+                      <p className="text-xs text-slate-500">Blind score</p>
+                      <p className="font-semibold">{candidate.bias_blind_analysis.blind_score}%</p>
+                    </div>
+                  </div>
+                  {candidate.bias_blind_analysis.decision_changed && (
+                    <p className="text-xs font-medium text-amber-700">
+                      Decision changed: {candidate.bias_blind_analysis.standard_decision} →{" "}
+                      {candidate.bias_blind_analysis.blind_decision}
+                    </p>
+                  )}
+                </CardBody>
+              </Card>
+            )}
+
+            {candidate.duplicate_warning?.is_duplicate && (
+              <Card>
+                <CardBody className="text-sm text-amber-800">
+                  <p className="font-semibold">Possible duplicate application</p>
+                  <p className="mt-1">{candidate.duplicate_warning.message}</p>
+                </CardBody>
+              </Card>
+            )}
+
+            {candidate.interview_questions && candidate.interview_questions.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <h3 className="text-sm font-semibold">Suggested Interview Questions</h3>
+                </CardHeader>
+                <CardBody>
+                  <ol className="list-decimal space-y-3 pl-4 text-sm text-slate-700">
+                    {candidate.interview_questions.map((q, index) => (
+                      <li key={`${q.category}-${index}`}>
+                        <span className="text-xs uppercase text-slate-400">{q.category.replace("_", " ")}</span>
+                        <p className="mt-0.5">{q.question}</p>
+                      </li>
+                    ))}
+                  </ol>
+                </CardBody>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

@@ -43,6 +43,19 @@ export function AISettingsPage() {
                 />
                 Enable semantic matching preference (client flag)
               </label>
+              <label className="flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50/50 p-3">
+                <input
+                  type="checkbox"
+                  checked={aiSettings.biasBlindMode}
+                  onChange={(e) => updateAISettings({ biasBlindMode: e.target.checked })}
+                />
+                <div>
+                  <span className="font-medium text-slate-800">Bias-blind screening mode</span>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Anonymizes names, contact info, and institutions before scoring for fairer hiring.
+                  </p>
+                </div>
+              </label>
             </CardBody>
           </Card>
 

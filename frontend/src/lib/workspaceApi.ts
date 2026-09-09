@@ -39,7 +39,7 @@ export async function scheduleInterviewApi(
   candidateId: string,
   jobId: string,
   type = "Technical",
-  interviewer = "Ramiyaa"
+  interviewer = "Recruiter"
 ) {
   const { data } = await api.post("/workspace/interviews", {
     candidateId,

@@ -1,5 +1,6 @@
 import axios from "axios";
-import type { ScreeningResponse } from "@/types";
+import type { JdQuality, ScreeningResponse } from "@/types";
+import { getAuthToken } from "@/lib/auth";
 import { getApiBase, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
 import {
   MAX_FILE_SIZE_MB,
@@ -20,6 +21,14 @@ export const api = axios.create({
   timeout: 600000,
 });
 
+api.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export function syncApiClientBaseUrl() {
   api.defaults.baseURL = getApiBase();
 }
@@ -33,13 +42,23 @@ export async function runDemoScreening(params?: {
   jobDescription?: string;
   requiredSkills?: string;
   jobId?: string;
+  biasBlindMode?: boolean;
 }) {
   const { data } = await api.post("/run-demo", {
     job_description: params?.jobDescription,
     required_skills: params?.requiredSkills,
     job_id: params?.jobId,
+    bias_blind_mode: Boolean(params?.biasBlindMode),
   });
   return data as ScreeningResponse;
+}
+
+export async function analyzeJobDescription(job_description: string, required_skills?: string) {
+  const { data } = await api.post("/analyze-jd", {
+    job_description,
+    required_skills,
+  });
+  return data as JdQuality;
 }
 
 export async function extractSkillsFromJd(job_description: string) {
@@ -74,6 +93,7 @@ export async function screenResumes(params: {
   jobDescriptionFile?: File | null;
   jobId?: string;
   append?: boolean;
+  biasBlindMode?: boolean;
 }) {
   validateResumeFiles(params.files);
 
@@ -81,6 +101,7 @@ export async function screenResumes(params: {
   formData.append("job_description", params.jobDescription);
   formData.append("required_skills", params.requiredSkills);
   formData.append("append", String(Boolean(params.append)));
+  formData.append("bias_blind_mode", String(Boolean(params.biasBlindMode)));
   if (params.jobDescriptionFile) {
     formData.append("job_description_file", params.jobDescriptionFile);
   }
@@ -119,6 +140,7 @@ export async function screenResumesInBatches(
     jobId?: string;
     /** When true, all batches append to existing candidates instead of replacing on the first batch. */
     append?: boolean;
+    biasBlindMode?: boolean;
   },
   onProgress?: (progress: BatchProgress) => void
 ) {
@@ -127,6 +149,8 @@ export async function screenResumesInBatches(
   const batches = chunkFiles(params.files, RESUME_BATCH_SIZE);
   const allResults: ScreeningResponse["results"] = [];
   let processedFiles = 0;
+  let jdQuality: JdQuality | undefined;
+  let duplicateAlerts: ScreeningResponse["duplicate_alerts"] = [];
 
   for (let index = 0; index < batches.length; index += 1) {
     const batch = batches[index];
@@ -143,10 +167,13 @@ export async function screenResumesInBatches(
       files: batch,
       jobId: params.jobId,
       append: params.append ? true : index > 0,
+      biasBlindMode: params.biasBlindMode,
     });
 
     allResults.push(...data.results);
     processedFiles += batch.length;
+    jdQuality = data.jd_quality ?? jdQuality;
+    duplicateAlerts = [...(duplicateAlerts ?? []), ...(data.duplicate_alerts ?? [])];
   }
 
   onProgress?.({
@@ -159,8 +186,13 @@ export async function screenResumesInBatches(
   return {
     message: "Resume screening completed successfully",
     total_candidates: allResults.length,
+    jd_quality: jdQuality,
+    duplicate_alerts: duplicateAlerts,
     results: allResults,
-  } satisfies Pick<ScreeningResponse, "message" | "total_candidates" | "results">;
+  } satisfies Pick<
+    ScreeningResponse,
+    "message" | "total_candidates" | "results" | "jd_quality" | "duplicate_alerts"
+  >;
 }
 
 export function downloadResultsCsv(

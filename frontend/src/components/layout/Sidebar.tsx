@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Briefcase,
@@ -10,9 +10,11 @@ import {
   FileStack,
   SlidersHorizontal,
   HelpCircle,
+  LogOut,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWorkspace } from "@/store/WorkspaceContext";
 
 const mainNav = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -71,7 +73,14 @@ export function Sidebar({
   onClose: () => void;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { recruiter, logout, demoMode } = useWorkspace();
   void location;
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   const content = (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-white">
@@ -116,14 +125,28 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-border p-3">
-        <div className="flex items-center gap-2.5 rounded-lg bg-slate-50 px-2.5 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-            R
+        <div className="rounded-lg bg-slate-50 px-2.5 py-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+              {recruiter?.initials ?? "?"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-slate-900">
+                {recruiter?.name ?? "Recruiter"}
+              </p>
+              <p className="truncate text-xs text-slate-500">
+                {demoMode ? "Demo session" : recruiter?.role ?? "Recruiter"}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-900">Ramiyaa</p>
-            <p className="truncate text-xs text-slate-500">Senior Recruiter</p>
-          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-border bg-white px-2 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          >
+            <LogOut size={14} />
+            {demoMode ? "Exit demo" : "Sign out"}
+          </button>
         </div>
       </div>
     </aside>

@@ -9,8 +9,12 @@ export function HelpPage() {
         <Card>
           <CardBody className="space-y-3 text-sm text-slate-700">
             <p>
-              <strong>Quick start:</strong> On the login page, click <strong>Start demo session</strong>{" "}
-              to explore sample jobs, candidates, and interviews instantly.
+              <strong>Sign in:</strong> With Supabase configured, use your recruiter account from{" "}
+              <strong>Supabase Authentication → Users</strong>. Without Supabase, use{" "}
+              <code>ramiyaa@company.com</code> / <code>Recruit@2024</code>.
+            </p>
+            <p>
+              <strong>Sign out:</strong> Use <strong>Sign out</strong> in the sidebar or top bar to end your session.
             </p>
             <p>
               <strong>Live screening:</strong> Open any job → upload resumes or click{" "}

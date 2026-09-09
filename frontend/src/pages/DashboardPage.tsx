@@ -9,7 +9,7 @@ import { useWorkspace } from "@/store/WorkspaceContext";
 import { formatRelativeDate } from "@/lib/utils";
 
 export function DashboardPage() {
-  const { jobs, candidates, interviews, dbLoading, demoMode, loadDemoSeed, exitDemoSession } =
+  const { jobs, candidates, interviews, dbLoading, demoMode, recruiter, loadDemoSeed, exitDemoSession } =
     useWorkspace();
 
   const activeJobs = jobs.filter((j) => j.status === "active");
@@ -44,7 +44,7 @@ export function DashboardPage() {
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-[28px] font-semibold tracking-tight text-slate-900">
-              {greeting}, Ramiyaa
+              {greeting}, {recruiter?.name?.split(" ")[0] ?? "Recruiter"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               Here&apos;s what&apos;s happening across your recruitment pipeline.

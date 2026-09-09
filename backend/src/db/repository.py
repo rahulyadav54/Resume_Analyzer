@@ -77,6 +77,10 @@ def _candidate_row_to_api(row: dict[str, Any]) -> dict[str, Any]:
         "explanation": row.get("explanation") or "",
         "recommendation": row.get("recommendation") or {},
         "matching_breakdown": row.get("matching_breakdown") or {},
+        "integrity_check": (row.get("matching_breakdown") or {}).get("integrity_check") or {},
+        "interview_questions": (row.get("matching_breakdown") or {}).get("interview_questions") or [],
+        "bias_blind_analysis": (row.get("matching_breakdown") or {}).get("bias_blind_analysis"),
+        "duplicate_warning": (row.get("matching_breakdown") or {}).get("duplicate_warning"),
         "uploadedAt": row["uploaded_at"],
     }
 
@@ -116,7 +120,13 @@ def _candidate_result_to_row(job_id: str, result: dict[str, Any], file_name: str
         "decision": result.get("decision") or "",
         "explanation": result.get("explanation") or "",
         "recommendation": result.get("recommendation") or {},
-        "matching_breakdown": result.get("matching_breakdown") or {},
+        "matching_breakdown": {
+            **(result.get("matching_breakdown") or {}),
+            "integrity_check": result.get("integrity_check") or {},
+            "interview_questions": result.get("interview_questions") or [],
+            "bias_blind_analysis": result.get("bias_blind_analysis"),
+            "duplicate_warning": result.get("duplicate_warning"),
+        },
         "uploaded_at": _now_iso(),
     }
 

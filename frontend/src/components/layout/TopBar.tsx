@@ -1,6 +1,7 @@
-import { Bell, HelpCircle, Menu, Search, Settings } from "lucide-react";
+import { Bell, HelpCircle, LogOut, Menu, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/Input";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useWorkspace } from "@/store/WorkspaceContext";
 
 export function TopBar({
   title,
@@ -13,6 +14,14 @@ export function TopBar({
   onMenu: () => void;
   actions?: React.ReactNode;
 }) {
+  const navigate = useNavigate();
+  const { recruiter, logout, demoMode } = useWorkspace();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b border-border bg-white/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 md:px-6">
       <button
@@ -50,9 +59,18 @@ export function TopBar({
         >
           <Settings size={16} />
         </Link>
-        <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-          R
-        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="ml-1 flex h-8 items-center gap-2 rounded-full bg-brand-50 px-2 pl-1 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
+          title={demoMode ? "Exit demo" : "Sign out"}
+        >
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100">
+            {recruiter?.initials ?? "?"}
+          </span>
+          <span className="hidden pr-1 sm:inline">{demoMode ? "Exit" : "Sign out"}</span>
+          <LogOut size={14} className="hidden sm:block" />
+        </button>
       </div>
     </header>
   );

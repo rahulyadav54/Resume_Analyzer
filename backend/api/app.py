@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from src.text_extractor import extract_resume_text
 from src.skill_matcher import extract_skills_from_jd
 from src.screening_service import screen_resume_files, run_demo_screening, UPLOAD_FOLDER
+from src.jd_analyzer import analyze_job_description
 from src.config import MAX_FILE_SIZE_MB, MAX_RESUMES_PER_REQUEST, MAX_RESUMES_TOTAL
 from src.db.repository import (
     count_job_candidates,
@@ -23,6 +24,7 @@ from src.db.repository import (
     save_screening_results,
 )
 from api.workspace import router as workspace_router
+from api.auth import router as auth_router
 
 app = FastAPI(
     title="Automated Resume Screening API",
@@ -54,6 +56,7 @@ app.add_middleware(
 )
 
 app.include_router(workspace_router)
+app.include_router(auth_router)
 
 
 class JobDescriptionRequest(BaseModel):
@@ -64,6 +67,12 @@ class DemoScreeningRequest(BaseModel):
     job_description: Optional[str] = None
     required_skills: Optional[str] = None
     job_id: Optional[str] = None
+    bias_blind_mode: bool = False
+
+
+class JdAnalysisRequest(BaseModel):
+    job_description: str
+    required_skills: Optional[str] = None
 
 
 @app.get("/")
@@ -100,6 +109,7 @@ def run_demo(payload: DemoScreeningRequest = DemoScreeningRequest()):
         response = run_demo_screening(
             job_description=payload.job_description,
             required_skills=skills_list or None,
+            bias_blind_mode=payload.bias_blind_mode,
         )
 
         if payload.job_id and is_db_enabled():
@@ -118,6 +128,19 @@ def run_demo(payload: DemoScreeningRequest = DemoScreeningRequest()):
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Demo screening failed: {exc}")
+
+
+@app.post("/analyze-jd")
+def analyze_jd_endpoint(payload: JdAnalysisRequest):
+    if not payload.job_description.strip():
+        raise HTTPException(status_code=400, detail="Job description cannot be empty.")
+
+    skills_list = [
+        skill.strip().lower()
+        for skill in (payload.required_skills or "").split(",")
+        if skill.strip()
+    ]
+    return analyze_job_description(payload.job_description, skills_list or None)
 
 
 @app.post("/extract-skills-from-jd")
@@ -141,6 +164,7 @@ async def screen_resumes(
     job_description_file: Optional[UploadFile] = File(None),
     job_id: Optional[str] = Form(None),
     append: bool = Form(False),
+    bias_blind_mode: bool = Form(False),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="Please upload at least one resume.")
@@ -224,6 +248,7 @@ async def screen_resumes(
             file_paths=saved_paths,
             job_description=jd_text,
             required_skills=skills_list or None,
+            bias_blind_mode=bias_blind_mode,
         )
 
         if job_id and is_db_enabled():
