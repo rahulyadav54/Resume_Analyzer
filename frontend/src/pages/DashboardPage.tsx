@@ -4,6 +4,7 @@ import { PageHeader, PageBody } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { MetricCard, EmptyState } from "@/components/ui/MetricCard";
 import { Badge } from "@/components/ui/Badge";
+import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
 import { useWorkspace } from "@/store/WorkspaceContext";
 import { formatRelativeDate } from "@/lib/utils";
 
@@ -38,13 +39,7 @@ export function DashboardPage() {
           </div>
         )}
 
-        {!demoMode && !dbEnabled && !dbLoading && (
-          <div className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Database not connected. Add <code className="text-xs">SUPABASE_URL</code> and{" "}
-            <code className="text-xs">SUPABASE_SERVICE_KEY</code> to your backend to persist jobs
-            and candidates.
-          </div>
-        )}
+        <ConnectionBanner />
 
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -61,9 +56,11 @@ export function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={loadDemoSeed}>
-              <Play size={14} /> Load Demo Data
-            </Button>
+            {!demoMode && (
+              <Button variant="secondary" size="sm" onClick={loadDemoSeed}>
+                <Play size={14} /> Load Demo Data
+              </Button>
+            )}
             <Link to="/jobs">
               <Button variant="secondary" size="sm">
                 <Upload size={14} /> Upload Resumes

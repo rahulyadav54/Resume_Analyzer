@@ -1,16 +1,21 @@
 import axios from "axios";
 import type { ScreeningResponse } from "@/types";
+import { getApiBase, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+export { getApiBase, isUsingLocalApi, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
 
 export const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: getApiBase(),
   timeout: 120000,
 });
 
+export function syncApiClientBaseUrl() {
+  api.defaults.baseURL = getApiBase();
+}
+
 export async function healthCheck() {
   const { data } = await api.get("/health");
-  return data as { status: string };
+  return data as { status: string; database?: { enabled: boolean; status: string } };
 }
 
 export async function runDemoScreening(params?: {

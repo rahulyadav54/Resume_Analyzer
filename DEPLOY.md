@@ -30,11 +30,15 @@
 3. **Framework Preset:** Vite
 4. **Build Command:** `npm run build`
 5. **Output Directory:** `dist`
-6. **Environment Variable:**
+6. **Environment Variable (required):**
 
    | Name | Value |
    |------|--------|
    | `VITE_API_BASE` | `https://YOUR-API.onrender.com` |
+
+   > Without this, the Vercel app calls `http://127.0.0.1:8000` and Supabase will never connect.
+
+   **Alternative:** edit `frontend/public/config.json` → set `apiBase` to your Render URL, then redeploy.
 
 7. Deploy.
 
@@ -68,8 +72,9 @@ See [`supabase/SETUP.md`](supabase/SETUP.md) for full steps.
 
 1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql).
 2. Add to **Render** environment:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_KEY` (service role — backend only)
+   - `SUPABASE_URL` = `https://xxxxx.supabase.co`
+   - `SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_KEY`
+   - `CORS_ORIGINS` = `https://your-app.vercel.app`
 3. Redeploy Render.
 4. Check `https://YOUR-API.onrender.com/health` → `database.enabled: true`.
 

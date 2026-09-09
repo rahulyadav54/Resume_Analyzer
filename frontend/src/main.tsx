@@ -2,9 +2,17 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { loadRuntimeApiConfig, syncApiClientBaseUrl } from "@/lib/api";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+async function bootstrap() {
+  await loadRuntimeApiConfig();
+  syncApiClientBaseUrl();
+
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}
+
+bootstrap();

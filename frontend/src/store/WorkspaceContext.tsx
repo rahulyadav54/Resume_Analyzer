@@ -11,6 +11,7 @@ import type {
 } from "@/types";
 import { DEFAULT_WEIGHTS } from "@/lib/scoring";
 import { uid } from "@/lib/utils";
+import { getApiBase, isUsingLocalApi } from "@/lib/api";
 import {
   createJobApi,
   fetchWorkspace,
@@ -120,9 +121,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setResumes(data.resumes);
     } catch {
       setDbEnabled(false);
+      const apiUrl = getApiBase();
+      const description =
+        isUsingLocalApi() && import.meta.env.PROD
+          ? `Production app is calling ${apiUrl}. Set VITE_API_BASE on Vercel to your Render API URL and redeploy.`
+          : `Could not reach ${apiUrl}. Check Render is live, CORS allows your Vercel domain, and Supabase env vars are set on Render.`;
       addToast({
         title: "Could not load workspace",
-        description: "Check that the backend is running and Supabase is configured.",
+        description,
         type: "error",
       });
     } finally {
@@ -131,6 +137,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [addToast]);
 
   const loadDemoSeed = useCallback(() => {
+    setDemoMode(true);
     setJobs(SEED_JOBS);
     setCandidates(SEED_CANDIDATES);
     setInterviews(SEED_INTERVIEWS);
