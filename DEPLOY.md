@@ -9,8 +9,8 @@
    ```
    https://YOUR-VERCEL-APP.vercel.app
    ```
-5. Deploy and copy your API URL, e.g. `https://ai-recruit-api.onrender.com`.
-6. Test: open `https://YOUR-API.onrender.com/health` → should return `{"status":"ok"}`.
+5. Deploy and copy your API URL: `https://resume-analyzer-v94j.onrender.com`
+6. Test: open `https://resume-analyzer-v94j.onrender.com/health` → should return `{"status":"ok","database":{"enabled":true}}`.
 
 ### Render manual setup (without Blueprint)
 
@@ -34,7 +34,7 @@
 
    | Name | Value |
    |------|--------|
-   | `VITE_API_BASE` | `https://YOUR-API.onrender.com` |
+   | `VITE_API_BASE` | `https://resume-analyzer-v94j.onrender.com` |
 
    > Without this, the Vercel app calls `http://127.0.0.1:8000` and Supabase will never connect.
 
@@ -50,7 +50,7 @@
 
 1. In **Render** → your web service → **Environment** → set:
    ```
-   CORS_ORIGINS=https://YOUR-VERCEL-APP.vercel.app
+   CORS_ORIGINS=https://resume-analyzer-lyart-kappa.vercel.app
    ```
    Add preview URLs if needed (comma-separated, no trailing slash).
 2. Redeploy Render after changing CORS.
