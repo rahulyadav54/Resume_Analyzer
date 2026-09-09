@@ -9,7 +9,7 @@ import { useWorkspace } from "@/store/WorkspaceContext";
 import { formatRelativeDate } from "@/lib/utils";
 
 export function DashboardPage() {
-  const { jobs, candidates, interviews, dbEnabled, dbLoading, demoMode, loadDemoSeed, exitDemoSession } =
+  const { jobs, candidates, interviews, dbLoading, demoMode, loadDemoSeed, exitDemoSession } =
     useWorkspace();
 
   const activeJobs = jobs.filter((j) => j.status === "active");
@@ -48,11 +48,6 @@ export function DashboardPage() {
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               Here&apos;s what&apos;s happening across your recruitment pipeline.
-              {dbEnabled && (
-                <span className="ml-2 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  Supabase connected
-                </span>
-              )}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

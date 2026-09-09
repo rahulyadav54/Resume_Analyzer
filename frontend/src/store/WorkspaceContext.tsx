@@ -221,7 +221,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setJobs((j) => [created, ...j]);
       addToast({
         title: "Job created (session only)",
-        description: "Connect Supabase on the backend to persist jobs.",
+        description: "Changes in this session won't be saved after refresh.",
         type: "info",
       });
       return created;
