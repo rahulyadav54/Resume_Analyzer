@@ -3,7 +3,18 @@ const PRODUCTION_PROXY = "/api";
 
 let resolvedBase = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/$/, "");
 
+function isVercelProduction(): boolean {
+  return (
+    import.meta.env.PROD &&
+    typeof window !== "undefined" &&
+    (window.location.hostname.includes("vercel.app") ||
+      window.location.hostname.includes("resume-analyzer"))
+  );
+}
+
 export function getApiBase(): string {
+  // Always use same-origin proxy on Vercel — avoids CORS even if env var is wrong
+  if (isVercelProduction()) return PRODUCTION_PROXY;
   if (resolvedBase) return resolvedBase;
   if (import.meta.env.PROD) return PRODUCTION_PROXY;
   return LOCAL_API;
@@ -27,6 +38,11 @@ export function getApiDisplayUrl(): string {
 }
 
 export async function loadRuntimeApiConfig(): Promise<string> {
+  if (isVercelProduction()) {
+    setApiBase(PRODUCTION_PROXY);
+    return getApiBase();
+  }
+
   if (import.meta.env.VITE_API_BASE?.trim()) {
     setApiBase(import.meta.env.VITE_API_BASE);
     return getApiBase();

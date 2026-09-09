@@ -11,7 +11,7 @@ import type {
 } from "@/types";
 import { DEFAULT_WEIGHTS } from "@/lib/scoring";
 import { uid } from "@/lib/utils";
-import { getApiBase, isUsingLocalApi } from "@/lib/api";
+import { getApiDisplayUrl, isUsingLocalApi } from "@/lib/api";
 import {
   createJobApi,
   fetchWorkspace,
@@ -112,28 +112,38 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const refreshFromDb = useCallback(async () => {
     setDbLoading(true);
-    try {
-      const data = await fetchWorkspace();
-      setDbEnabled(data.dbEnabled);
-      setJobs(data.jobs);
-      setCandidates(data.candidates);
-      setInterviews(data.interviews);
-      setResumes(data.resumes);
-    } catch {
-      setDbEnabled(false);
-      const apiUrl = getApiBase();
-      const description =
-        isUsingLocalApi() && import.meta.env.PROD
-          ? `Production app is calling ${apiUrl}. Set VITE_API_BASE on Vercel to your Render API URL and redeploy.`
-          : `Could not reach ${apiUrl}. Check Render is live, CORS allows your Vercel domain, and Supabase env vars are set on Render.`;
-      addToast({
-        title: "Could not load workspace",
-        description,
-        type: "error",
-      });
-    } finally {
-      setDbLoading(false);
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const data = await fetchWorkspace();
+        setDbEnabled(data.dbEnabled);
+        setJobs(data.jobs);
+        setCandidates(data.candidates);
+        setInterviews(data.interviews);
+        setResumes(data.resumes);
+        setDbLoading(false);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 12000));
+        }
+      }
     }
+
+    setDbEnabled(false);
+    const apiUrl = getApiDisplayUrl();
+    const description =
+      isUsingLocalApi() && import.meta.env.PROD
+        ? `Production app is calling ${apiUrl}. Redeploy Vercel with VITE_API_BASE=/api.`
+        : `Could not reach ${apiUrl}. Render free tier may take up to 60s to wake up — click Retry.`;
+    addToast({
+      title: "Could not load workspace",
+      description,
+      type: "error",
+    });
+    console.error("Workspace load failed:", lastError);
+    setDbLoading(false);
   }, [addToast]);
 
   const loadDemoSeed = useCallback(() => {
