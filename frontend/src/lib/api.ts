@@ -2,7 +2,13 @@ import axios from "axios";
 import type { ScreeningResponse } from "@/types";
 import { getApiBase, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
 
-export { getApiBase, isUsingLocalApi, loadRuntimeApiConfig, setApiBase } from "@/lib/apiBase";
+export {
+  getApiBase,
+  getApiDisplayUrl,
+  isUsingLocalApi,
+  loadRuntimeApiConfig,
+  setApiBase,
+} from "@/lib/apiBase";
 
 export const api = axios.create({
   baseURL: getApiBase(),

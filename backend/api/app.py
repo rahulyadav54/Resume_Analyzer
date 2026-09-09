@@ -24,16 +24,23 @@ app = FastAPI(
 
 
 def _cors_origins() -> list[str]:
-    raw = os.getenv("CORS_ORIGINS", "*").strip()
+    default = "https://resume-analyzer-lyart-kappa.vercel.app,http://localhost:5173"
+    raw = os.getenv("CORS_ORIGINS", default).strip()
     if raw == "*":
         return ["*"]
-    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    for origin in default.split(","):
+        origin = origin.strip()
+        if origin and origin not in origins:
+            origins.append(origin)
+    return origins
 
 
+_cors = _cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins(),
-    allow_credentials=True,
+    allow_origins=_cors,
+    allow_credentials="*" not in _cors,
     allow_methods=["*"],
     allow_headers=["*"],
 )
